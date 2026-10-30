@@ -1,3 +1,7 @@
+## 0.2.2
+
+* The default channel is named `General Notifications` / `الإشعارات العامة` again.
+
 ## 0.2.1
 
 * The default channel is named `General` / `عامة`, with the description `General App Notifications` / `إشعارات التطبيق العامة`.

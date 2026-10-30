@@ -34,8 +34,8 @@ final class PushSettings {
   final Option<LogSink> logger;
 
   String get channelName => switch (locale) {
-    ServiceLocale.ar => 'عامة',
-    ServiceLocale.en => 'General',
+    ServiceLocale.ar => 'الإشعارات العامة',
+    ServiceLocale.en => 'General Notifications',
   };
 
   String get channelDescription => switch (locale) {

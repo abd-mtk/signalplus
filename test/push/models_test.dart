@@ -21,9 +21,9 @@ void main() {
       const PushSettings arabic = PushSettings(appName: 'A', locale: ServiceLocale.ar);
       final PushSettings english = arabic.localized(ServiceLocale.en);
 
-      expect(arabic.channelName, 'عامة');
+      expect(arabic.channelName, 'الإشعارات العامة');
       expect(arabic.groupSummary(3), 'إشعارات جديدة: 3');
-      expect(english.channelName, 'General');
+      expect(english.channelName, 'General Notifications');
       expect(english.groupSummary(1), '1 New Notification');
       expect(english.groupSummary(2), '2 New Notifications');
     });

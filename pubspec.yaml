@@ -1,6 +1,6 @@
 name: signalplus
 description: "Receives push notifications and manages the signed-in person's device, profile, preferences and topics in the SignalPlus service."
-version: 0.2.1
+version: 0.2.2
 repository: https://github.com/abd-mtk/signalplus
 publish_to: none
 
