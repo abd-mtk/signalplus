@@ -1,25 +1,29 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/widgets.dart';
 
 import '../api/client/api_config.dart';
 import '../api/domain/entities/enums.dart';
 import '../core/kits/domain_kit.dart';
 import '../core/utils/logger.dart';
 import '../push/models/push_config.dart';
+import '../push/models/push_settings.dart';
 
 final class SignalPlusConfig {
   const SignalPlusConfig({
     required this.appId,
-    required this.locale,
+    this.locale = const None(),
     this.push = const PushConfig(),
     this.baseUrl = ApiConfig.defaultBaseUrl,
     this.timeout = const Duration(seconds: 20),
     this.registerOnStart = true,
     this.firebaseOptions = const None(),
+    this.logger = const None(),
   });
 
   final String appId;
 
-  final ServiceLocale locale;
+  /// The app's language; without it, the device's.
+  final Option<ServiceLocale> locale;
 
   final PushConfig push;
 
@@ -31,17 +35,19 @@ final class SignalPlusConfig {
 
   final Option<FirebaseOptions> firebaseOptions;
 
-  SignalPlusConfig withPush(final PushConfig value) => SignalPlusConfig(
-    appId: appId,
-    locale: locale,
-    push: value,
-    baseUrl: baseUrl,
-    timeout: timeout,
-    registerOnStart: registerOnStart,
-    firebaseOptions: firebaseOptions,
-  );
+  final Option<LogSink> logger;
 
-  ApiConfig get api => ApiConfig(appId: appId, locale: locale, baseUrl: baseUrl, timeout: timeout);
+  ServiceLocale get language => locale.getOrElse(deviceLanguage);
 
-  KitLogger get logger => push.kitLogger.tagged('SignalPlus');
+  ApiConfig get api => ApiConfig(appId: appId, locale: language, baseUrl: baseUrl, timeout: timeout);
+
+  KitLogger get log => KitLogger.of(logger).tagged('SignalPlus');
+
+  PushSettings settings({required final String appName}) =>
+      PushSettings(appName: appName, locale: language, options: push, logger: logger);
+
+  static ServiceLocale deviceLanguage() =>
+      WidgetsFlutterBinding.ensureInitialized().platformDispatcher.locale.languageCode == ServiceLocale.ar.wire
+          ? ServiceLocale.ar
+          : ServiceLocale.en;
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import '../api/domain/entities/catalog.dart';
 import '../api/domain/entities/device_auth.dart';
 import '../api/domain/entities/enums.dart';
@@ -9,8 +11,9 @@ import '../api/signalplus_client.dart';
 import '../core/kits/data_kit.dart';
 import '../device/device_snapshot.dart';
 import '../device/installation_id_store.dart';
+import '../push/messages/extensions.dart';
 import '../push/models/notification_payload.dart';
-import '../push/models/push_config.dart';
+import '../push/models/push_settings.dart';
 import '../push/notification/notification_channel.dart';
 import '../push/push_port.dart';
 import 'signal_plus_config.dart';
@@ -29,16 +32,19 @@ abstract final class Operations {
 final class SignalPlusRuntime {
   SignalPlusRuntime({
     required this.config,
+    required this.settings,
     required this.push,
     required this.client,
     required this.installationIds,
     required this.externalIds,
     required this.device,
-  }) : logger = config.logger;
+  }) : logger = config.log;
 
   static const List<String> lostDevice = <String>[ServiceErrorCodes.installationNotFound];
 
   final SignalPlusConfig config;
+
+  final PushSettings settings;
 
   final PushPort push;
 
@@ -62,7 +68,7 @@ final class SignalPlusRuntime {
 
   bool categoryChannels = false;
 
-  ServiceLocale get currentLocale => locale.getOrElse(() => config.locale);
+  ServiceLocale get currentLocale => locale.getOrElse(() => config.language);
 
   Future<Either<ServiceFailure, SdkInstallationEntity>> registerDevice({required final ServiceLocale locale}) =>
       serialized(() => register(locale));
@@ -133,10 +139,14 @@ final class SignalPlusRuntime {
     });
   }
 
+  /// One Android channel per category, brought in line with the dashboard on every start.
+  Future<void> syncChannels() async {
+    if (defaultTargetPlatform.isAndroid) await categories(createChannels: true);
+  }
+
   Future<void> refreshChannels(final ServiceLocale language) async {
-    final PushConfig display = config.push.localized(language);
     await guard(() async {
-      await push.registerChannels(<ChannelSpec>[ChannelSpec.fromConfig(display)]);
+      await push.registerChannels(<ChannelSpec>[ChannelSpec.fromSettings(settings.localized(language))]);
       return unit;
     }, Operations.createChannels);
     if (categoryChannels) await categories(createChannels: true);

@@ -1,12 +1,17 @@
 import 'package:flutter/foundation.dart';
+import 'package:fpdart/fpdart.dart';
 
 typedef LogSink = void Function(String tag, String message);
 
 final class KitLogger {
   const KitLogger({required this.sink, this.tag = 'SignalPlus'});
 
-  factory KitLogger.debug({final bool enabled = true, final String tag = 'SignalPlus'}) =>
+  factory KitLogger.debug({final bool enabled = kDebugMode, final String tag = 'SignalPlus'}) =>
       KitLogger(sink: enabled ? debugSink : silentSink, tag: tag);
+
+  /// The app's own sink when it gave one, otherwise logs in debug builds only.
+  factory KitLogger.of(final Option<LogSink> sink) =>
+      sink.match(KitLogger.debug, (final LogSink value) => KitLogger(sink: value));
 
   final LogSink sink;
 

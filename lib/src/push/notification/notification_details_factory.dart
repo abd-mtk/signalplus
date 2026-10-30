@@ -1,18 +1,18 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:fpdart/fpdart.dart';
 
-import '../models/push_config.dart';
+import '../models/push_settings.dart';
 import 'notification_channel.dart';
 import 'notification_image.dart';
 
 final class NotificationDetailsFactory {
   const NotificationDetailsFactory(this.config);
 
-  final PushConfig config;
+  final PushSettings config;
 
-  String get groupKey => '${config.channelId}.group';
+  String get groupKey => '${PushSettings.channelId}.group';
 
-  ChannelSpec get defaultChannel => ChannelSpec.fromConfig(config);
+  ChannelSpec get defaultChannel => ChannelSpec.fromSettings(config);
 
   NotificationDetails message({
     required final String title,
@@ -39,8 +39,7 @@ final class NotificationDetailsFactory {
         playSound: true,
         enableVibration: true,
         autoCancel: true,
-        icon: config.notificationIcon,
-        groupKey: config.groupNotifications ? groupKey : null,
+        groupKey: config.options.groupNotifications ? groupKey : null,
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
@@ -59,7 +58,7 @@ final class NotificationDetailsFactory {
 
   NotificationDetails summary(final int count) => NotificationDetails(
     android: AndroidNotificationDetails(
-      config.channelId,
+      PushSettings.channelId,
       config.channelName,
       channelDescription: config.channelDescription,
       importance: Importance.max,

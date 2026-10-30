@@ -3,7 +3,7 @@
 Push notifications for Flutter apps on SignalPlus. Receive notifications, sign users in and out, and let them manage their notification settings and topics. All you need is your environment's **App ID**: no API key in the app, and no code on your backend.
 
 ```dart
-await SignalPlus.init(const SignalPlusConfig(appId: 'sdk_01J9…', locale: ServiceLocale.ar));
+await SignalPlus.init(const SignalPlusConfig(appId: 'sdk_01J9…'));
 await SignalPlus.login(user.id);
 ```
 
@@ -32,7 +32,7 @@ dependencies:
   signalplus:
     git:
       url: https://github.com/abd-mtk/signalplus.git
-      ref: v0.1.0
+      ref: main
 ```
 
 ```dart
@@ -45,43 +45,24 @@ Copy your App ID (`sdk_…`) from the dashboard: **Environment → App SDK**. It
 
 ## Platform setup
 
-### Android
-
-1. Add `google-services.json` (`flutterfire configure` does this).
-2. In `android/app/src/main/AndroidManifest.xml`:
-
-   ```xml
-   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-
-   <meta-data
-       android:name="com.google.firebase.messaging.default_notification_icon"
-       android:resource="@drawable/ic_notification" />
-   <meta-data
-       android:name="com.google.firebase.messaging.default_notification_channel_id"
-       android:value="signalplus_default" />
-   ```
-
-3. Use `compileSdk` 35+ and turn on core library desugaring in `android/app/build.gradle.kts`:
-
-   ```kotlin
-   android {
-       compileOptions { isCoreLibraryDesugaringEnabled = true }
-   }
-   dependencies {
-       coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-   }
-   ```
-
-### iOS
-
-1. Add `GoogleService-Info.plist` (`flutterfire configure`).
+1. Connect the app to Firebase: `flutterfire configure`. It adds `google-services.json` and `GoogleService-Info.plist`.
 2. Upload an **APNs authentication key** (`.p8`) in Firebase Console → Project settings → Cloud Messaging.
-3. In Xcode, target **Runner** → Signing & Capabilities: add **Push Notifications**, and **Background Modes** → **Remote notifications**.
-4. For notification images, run once from your app's root:
+3. From your app's root:
 
    ```bash
-   dart run signalplus:setup_ios
+   dart run signalplus:setup
    ```
+
+   It changes only what is missing, so it is safe to run again:
+
+   - **Android:** turns on core library desugaring in `android/app/build.gradle(.kts)`, and raises `compileSdk` to 35 and `minSdk` to 24 when they are set lower.
+   - **iOS:** turns on Push Notifications and Background Modes → Remote notifications, and adds the extension that shows notification images. It needs the `xcodeproj` gem, which CocoaPods already installs.
+
+Nothing goes in `AndroidManifest.xml`: the package brings the notification permission, the default channel and the notification icon in its own manifest.
+
+**The notification icon.** On Android, put your own as `android/app/src/main/res/drawable/ic_notification.png`: a white shape on a transparent background. Without it, the package's bell is used. On iOS, notifications always show the app icon.
+
+If your app already sets `com.google.firebase.messaging.default_notification_icon` or `default_notification_channel_id` to another value, add `tools:replace="android:resource"` (or `android:value`) to that `<meta-data>`, as the build error suggests.
 
 Test on a real device; the simulator does not receive push reliably.
 
@@ -94,23 +75,17 @@ import 'package:flutter/material.dart';
 import 'package:signalplus/signalplus.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  await SignalPlus.init(
-    const SignalPlusConfig(
-      appId: 'sdk_01J9…',
-      locale: ServiceLocale.ar, // the app's current language
-    ),
-  );
+  await SignalPlus.init(const SignalPlusConfig(appId: 'sdk_01J9…'));
 
   SignalPlus.onNotificationTap((final NotificationPayload payload) => openScreen(payload.data));
-  await SignalPlus.categories(); // one Android channel per category
 
   runApp(const MyApp());
 }
 ```
 
-`init` sets up Firebase and the notification channels, asks for permission, and registers the device. Notifications show by themselves in every state: open, in the background, or closed. From then on the device keeps itself up to date: every new FCM token or permission change registers it again by itself.
+`init` sets up Firebase and the notification channels, asks for permission, and registers the device. On Android it also creates one channel per category from the dashboard, on every start, so new categories and renamed ones reach the app without an update. Notifications show by themselves in every state: open, in the background, or closed. From then on the device keeps itself up to date: every new Firebase Installation ID or permission change registers it again by itself.
+
+The device registers with FCM by its Firebase Installation ID (`register` / `onRegistered`), not by the deprecated FCM token. On Android the package turns this on in its own manifest, so your app must not call `FirebaseMessaging.getToken()` or `deleteToken()` itself: with the flag on, they throw.
 
 ---
 
@@ -131,7 +106,7 @@ await SignalPlus.logout();
 
 ## Language
 
-Pass the app's current language to `init`. When the user changes it:
+By default the package follows the device language. If your app has its own language setting, pass it to `init` as `locale: Some(ServiceLocale.en)`, and when the user changes it:
 
 ```dart
 await SignalPlus.setLocale(ServiceLocale.en);
@@ -235,13 +210,13 @@ Every call returns `Either<ServiceFailure, T>` and never throws:
 );
 ```
 
-| Code | When |
-|---|---|
-| `ServiceErrorCodes.notSignedIn` | A user call before `login`. |
-| `ServiceErrorCodes.topicNotFound` | The topic was not created in the dashboard. |
-| `ServiceErrorCodes.appIdInvalid` | The App ID is wrong. |
+| Code                                 | When                                           |
+| ------------------------------------ | ---------------------------------------------- |
+| `ServiceErrorCodes.notSignedIn`      | A user call before `login`.                    |
+| `ServiceErrorCodes.topicNotFound`    | The topic was not created in the dashboard.    |
+| `ServiceErrorCodes.appIdInvalid`     | The App ID is wrong.                           |
 | `ServiceErrorCodes.validationFailed` | A value is invalid; see `failure.fieldErrors`. |
-| `ServiceErrorCodes.rateLimited` | Too many requests; try again later. |
+| `ServiceErrorCodes.rateLimited`      | Too many requests; try again later.            |
 
 `failure.type.isNetwork` is `true` when there is no connection or the request timed out.
 
@@ -251,51 +226,51 @@ Every call returns `Either<ServiceFailure, T>` and never throws:
 
 ### SignalPlusConfig
 
-| Option | Default | Description |
-|---|---|---|
-| `appId` | **required** | The environment's App ID (`sdk_…`). |
-| `locale` | **required** | The app's language: `ServiceLocale.ar` or `ServiceLocale.en`. |
-| `push` | `PushConfig()` | How notifications are shown (below). |
-| `registerOnStart` | `true` | Register the device right after `init`. |
+| Option            | Default                                                       | Description                                                                                     |
+| ----------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `appId`           | **required**                                                  | The environment's App ID (`sdk_…`).                                                             |
+| `locale` | the device language | `Some(ServiceLocale.ar)` or `Some(ServiceLocale.en)`, for apps with their own language setting. |
+| `push`            | `PushConfig()`                                                | How notifications are shown (below).                                                            |
+| `registerOnStart` | `true`                                                        | Register the device right after `init`.                                                         |
+| `logger`          | debug builds only                                             | `Some((tag, message) => …)` to send the package's logs to your own logger.                      |
+| `firebaseOptions` | read from `google-services.json` / `GoogleService-Info.plist` | Only for apps without those files, such as flavors that each point at another Firebase project. |
 
 ### PushConfig
 
-| Option | Default | Description |
-|---|---|---|
-| `notificationIcon` | `'@mipmap/ic_launcher'` | Android small icon: a white, transparent drawable. |
-| `requestPermissionOnStartup` | `true` | Ask for permission in `init`. |
-| `showForegroundNotification` | `true` | Show notifications while the app is open. |
-| `showNotificationImages` | `true` | Show the images notifications carry. |
-| `groupNotifications` | `false` | Group notifications under one summary on Android. |
-| `clearNotificationsOnLaunch` | `false` | Clear shown notifications when the app starts. |
-| `enableLogs` | `true` | Print logs in debug builds. |
+| Option                       | Default | Description                                       |
+| ---------------------------- | ------- | ------------------------------------------------- |
+| `requestPermissionOnStartup` | `true`  | Ask for permission in `init`.                     |
+| `showForegroundNotification` | `true`  | Show notifications while the app is open.         |
+| `showNotificationImages`     | `true`  | Show the images notifications carry.              |
+| `groupNotifications`         | `false` | Group notifications under one summary on Android. |
+| `clearNotificationsOnLaunch` | `false` | Clear shown notifications when the app starts.    |
 
-The app's name and the default channel name are set by the package, in the app's language.
+Everything else is set by the package: the app's name, the notification icon (your `ic_notification`, otherwise the package's bell), and the default channel name and group summary, in the app's language.
 
 ---
 
 ## API reference
 
-| Call | Returns | Purpose |
-|---|---|---|
-| `init(config)` | `Unit` | Set everything up and register the device. |
-| `login(externalId)` | `SdkInstallationEntity` | Link this device to the signed-in user. |
-| `logout()` | `SdkInstallationEntity` | Unlink the user from this device. |
-| `setLocale(locale)` | `SdkInstallationEntity` | Change the app's language. |
-| `onMessage(handler)` | `StreamSubscription` | Notifications while the app is open. |
-| `onNotificationTap(handler)` | `StreamSubscription` | Taps, including the launch tap. |
-| `onBackgroundMessage(handler)` | `Unit` | Optional: your own code for notifications that arrive while closed. |
-| `preferences()` | `PreferencesEntity` | Categories and quiet hours. |
-| `updatePreferences(choices)` | `UpdatedPreferencesEntity` | Turn categories on or off. |
-| `setQuietHours(quietHours)` / `clearQuietHours()` | `PreferencesEntity` | Quiet hours. |
-| `topics()` | `List<String>` | Topics available to follow. |
-| `recipientTopics()` | `List<String>` | Topics the user follows. |
-| `subscribe(topic)` / `unsubscribe(topic)` | `List<String>` | Follow or unfollow a topic. |
-| `categories()` | `List<CategoryEntity>` | Categories, and one Android channel each. |
-| `requestPermission()` / `permission()` | `PushPermission` | Ask for, or read, the permission. |
-| `clearNotifications()` | `Unit` | Remove shown notifications. |
-| `externalId()` | `Option<String>` | The user signed in on this device. |
-| `installationId()` | `String` | This device's id. |
+| Call                                              | Returns                    | Purpose                                                             |
+| ------------------------------------------------- | -------------------------- | ------------------------------------------------------------------- |
+| `init(config)`                                    | `Unit`                     | Set everything up and register the device.                          |
+| `login(externalId)`                               | `SdkInstallationEntity`    | Link this device to the signed-in user.                             |
+| `logout()`                                        | `SdkInstallationEntity`    | Unlink the user from this device.                                   |
+| `setLocale(locale)`                               | `SdkInstallationEntity`    | Change the app's language.                                          |
+| `onMessage(handler)`                              | `StreamSubscription`       | Notifications while the app is open.                                |
+| `onNotificationTap(handler)`                      | `StreamSubscription`       | Taps, including the launch tap.                                     |
+| `onBackgroundMessage(handler)`                    | `Unit`                     | Optional: your own code for notifications that arrive while closed. |
+| `preferences()`                                   | `PreferencesEntity`        | Categories and quiet hours.                                         |
+| `updatePreferences(choices)`                      | `UpdatedPreferencesEntity` | Turn categories on or off.                                          |
+| `setQuietHours(quietHours)` / `clearQuietHours()` | `PreferencesEntity`        | Quiet hours.                                                        |
+| `topics()`                                        | `List<String>`             | Topics available to follow.                                         |
+| `recipientTopics()`                               | `List<String>`             | Topics the user follows.                                            |
+| `subscribe(topic)` / `unsubscribe(topic)`         | `List<String>`             | Follow or unfollow a topic.                                         |
+| `categories()`                                    | `List<CategoryEntity>`     | The categories, for your own settings screen.                       |
+| `requestPermission()` / `permission()`            | `PushPermission`           | Ask for, or read, the permission.                                   |
+| `clearNotifications()`                            | `Unit`                     | Remove shown notifications.                                         |
+| `externalId()`                                    | `Option<String>`           | The user signed in on this device.                                  |
+| `installationId()`                                | `String`                   | This device's id.                                                   |
 
 ---
 

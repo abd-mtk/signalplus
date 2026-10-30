@@ -1,6 +1,6 @@
 name: signalplus
 description: "Receives push notifications and manages the signed-in person's device, profile, preferences and topics in the SignalPlus service."
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/abd-mtk/signalplus
 publish_to: none
 
@@ -10,9 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^5.0.0
-  firebase_messaging: ^17.0.0
-  flutter_local_notifications: ^22.3.2
+  firebase_core: ^5.1.0
+  firebase_messaging: ^17.0.1
+  flutter_local_notifications: ^22.3.3
   fpdart: ^1.2.0
   equatable: ^3.0.0
   http: ^1.6.0
@@ -31,5 +31,8 @@ dev_dependencies:
 flutter:
   plugin:
     platforms:
+      android:
+        package: com.signalplus
+        pluginClass: SignalPlusPlugin
       ios:
         pluginClass: SignalPlusPlugin

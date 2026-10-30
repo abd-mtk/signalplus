@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'ios_service_extension_templates.dart';
+import 'ios_templates.dart';
 
 typedef ProcessRunner = Future<ProcessResult> Function(String executable, List<String> arguments);
 
@@ -13,13 +13,16 @@ final class IosSetupResult {
   final String message;
 }
 
-final class IosServiceExtensionSetup {
-  const IosServiceExtensionSetup({required this.appRoot, this.run = Process.run});
+/// Adds the notification image extension, Push Notifications and Background Modes to the Runner project.
+final class IosSetup {
+  const IosSetup({required this.appRoot, this.run = Process.run});
 
   static const String targetName = 'NotificationService';
 
-  static const String missingProject =
-      'ios/Runner.xcodeproj not found. Run this command from the root of your Flutter app.';
+  static const String missingProject = 'ios/Runner.xcodeproj not found, skipped.';
+
+  static const String missingGoogleService =
+      'ios/Runner/GoogleService-Info.plist not found: run flutterfire configure (or pass firebaseOptions to init).';
 
   static const String missingGem = 'The xcodeproj Ruby gem is required. Install it with: gem install xcodeproj';
 
@@ -40,7 +43,12 @@ final class IosServiceExtensionSetup {
     final Directory scripts = await Directory.systemTemp.createTemp('signalplus');
     try {
       final ProcessResult result = await run('ruby', <String>[await writeScript(scripts), projectPath]);
-      if (result.exitCode == 0) return IosSetupResult.success('${result.stdout}'.trim());
+      if (result.exitCode == 0) {
+        final bool firebase = File('${iosDirectory.path}/Runner/GoogleService-Info.plist').existsSync();
+        return IosSetupResult.success(
+          <String>['${result.stdout}'.trim(), if (!firebase) missingGoogleService].join('\n'),
+        );
+      }
       final String error = '${result.stderr}'.trim();
       return IosSetupResult.failure(error.contains('cannot load such file -- xcodeproj') ? missingGem : error);
     } finally {

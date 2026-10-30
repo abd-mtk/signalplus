@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 import 'package:signalplus/src/push/notification/notification_channel.dart';
 import 'package:signalplus/src/push/notification/notification_details_factory.dart';
 import 'package:signalplus/src/push/notification/notification_image.dart';
@@ -18,7 +19,7 @@ void main() {
 
   test('message and summary share the group key when grouping is on', () {
     const NotificationDetailsFactory grouped = NotificationDetailsFactory(
-      PushConfig.resolved(appName: 'A', channelName: 'Orders', channelDescription: 'D', groupNotifications: true),
+      PushSettings(appName: 'A', locale: ServiceLocale.ar, options: PushConfig(groupNotifications: true)),
     );
 
     expect(grouped.groupKey, 'signalplus_default.group');

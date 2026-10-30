@@ -14,12 +14,13 @@ import '../device/fresh_install.dart';
 import '../device/installation_id_store.dart';
 import '../push/bootstrap/signalplus_instance.dart';
 import '../push/models/notification_payload.dart';
+import '../push/models/push_settings.dart';
 import '../push/push_port.dart';
 import 'background_entry.dart';
 import 'signal_plus_config.dart';
 import 'signal_plus_runtime.dart';
 
-typedef PushStarter = Future<PushPort> Function(SignalPlusConfig config);
+typedef PushStarter = Future<PushPort> Function(SignalPlusConfig config, PushSettings settings);
 
 typedef ClientFactory = SignalPlusClient Function(SignalPlusConfig config);
 
@@ -57,26 +58,28 @@ abstract final class SignalPlusState {
   static Future<Either<ServiceFailure, Unit>> init(final SignalPlusConfig config) {
     if (runtime.isSome()) return Future<Either<ServiceFailure, Unit>>.value(const Right(unit));
     return starting.getOrElse(() {
-      final Future<Either<ServiceFailure, Unit>> run = RepositoryGuard.guard(config.logger, () async {
+      final Future<Either<ServiceFailure, Unit>> run = RepositoryGuard.guard(config.log, () async {
         await prepare();
         final DeviceSnapshotReader device = createDevice(config);
         final String appName = await device.read().then(
           (final DeviceSnapshot snapshot) => snapshot.appName,
           onError: (final Object _) => '',
         );
-        final SignalPlusConfig resolved = config.withPush(config.push.display(appName: appName, locale: config.locale));
-        final PushPort push = await startPush(resolved);
-        await BackgroundSettings.saveConfig(secure, resolved.push);
+        final PushSettings settings = config.settings(appName: appName);
+        final PushPort push = await startPush(config, settings);
+        await BackgroundSettings.saveConfig(secure, settings);
         final SignalPlusRuntime value = SignalPlusRuntime(
-          config: resolved,
+          config: config,
+          settings: settings,
           push: push,
-          client: createClient(resolved),
+          client: createClient(config),
           installationIds: installationIds,
           externalIds: externalIds,
           device: device,
         );
         attach(value);
-        if (config.registerOnStart) unawaited(value.registerDevice(locale: config.locale));
+        unawaited(value.syncChannels());
+        if (config.registerOnStart) unawaited(value.registerDevice(locale: config.language));
         return unit;
       }, Operations.init).whenComplete(() => starting = const None());
       starting = some(run);
@@ -89,25 +92,27 @@ abstract final class SignalPlusState {
         final Either<ServiceFailure, SdkInstallationEntity> result = await value.registerDevice(locale: locale);
         await value.refreshChannels(locale);
         await value.guard(() async {
-          await BackgroundSettings.saveConfig(secure, value.config.push.localized(locale));
+          await BackgroundSettings.saveConfig(secure, value.settings.localized(locale));
           return unit;
         }, Operations.storage);
         return result;
       });
 
   static SignalPlusClient defaultClient(final SignalPlusConfig config) =>
-      SignalPlusClient.create(config.api, logger: config.logger);
+      SignalPlusClient.create(config.api, logger: config.log);
 
   static DeviceSnapshotReader defaultDevice(final SignalPlusConfig config) =>
-      PlatformDeviceSnapshotReader(logger: config.logger);
+      PlatformDeviceSnapshotReader(logger: config.log);
 
-  static Future<PushPort> startFirebase(final SignalPlusConfig config) => SignalPlusInstance.start(
-    config: config.push,
-    firebaseOptions: config.firebaseOptions,
-    backgroundHandler: const Some(signalPlusBackgroundEntry),
-  );
+  static Future<PushPort> startFirebase(final SignalPlusConfig config, final PushSettings settings) =>
+      SignalPlusInstance.start(
+        config: settings,
+        firebaseOptions: config.firebaseOptions,
+        backgroundHandler: const Some(signalPlusBackgroundEntry),
+      );
 
   static Future<bool> prepare() => prepared.getOrElse(() {
+    WidgetsFlutterBinding.ensureInitialized();
     final Future<bool> check = FreshInstall.resetIfNew(
       secure: secure,
       local: local,

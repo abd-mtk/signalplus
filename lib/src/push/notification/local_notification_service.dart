@@ -9,8 +9,8 @@ import 'package:fpdart/fpdart.dart';
 import '../../core/utils/logger.dart';
 import '../messages/message_mapper.dart';
 import '../models/notification_payload.dart';
-import '../models/push_config.dart';
 import '../models/push_events.dart';
+import '../models/push_settings.dart';
 import 'initial_notification.dart';
 import 'notification_channel.dart';
 import 'notification_details_factory.dart';
@@ -26,13 +26,13 @@ final class LocalNotificationService {
     final NotificationImageLoader loadImage = NotificationImages.download,
     this.attachmentDirectory = const None(),
   }) : plugin = plugin.getOrElse(FlutterLocalNotificationsPlugin.new),
-       loadImage = config.showNotificationImages ? loadImage : NotificationImages.none,
+       loadImage = config.options.showNotificationImages ? loadImage : NotificationImages.none,
        details = NotificationDetailsFactory(config),
        log = logger.tagged('LocalNotificationService');
 
   final FlutterLocalNotificationsPlugin plugin;
 
-  final PushConfig config;
+  final PushSettings config;
 
   final PushEvents events;
 
@@ -50,22 +50,16 @@ final class LocalNotificationService {
 
   static const MethodChannel native = MethodChannel('signalplus');
 
+  /// The app's own notification icon when it ships one, otherwise its launcher icon.
+  static const List<String> icons = <String>['@drawable/ic_notification', '@mipmap/ic_launcher'];
+
   Future<void> initialize({final bool background = false}) async {
-    await plugin.initialize(
-      settings: InitializationSettings(
-        android: AndroidInitializationSettings(config.notificationIcon),
-        iOS: const DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestBadgePermission: false,
-          requestSoundPermission: false,
-        ),
-      ),
-      onDidReceiveNotificationResponse: onTap,
-    );
+    await initializeWith(icons);
     await AndroidChannels.create(plugin, <ChannelSpec>[details.defaultChannel]);
+    await loadExistingChannels();
     if (background) return;
 
-    if (config.clearNotificationsOnLaunch) await clearDisplayed();
+    if (config.options.clearNotificationsOnLaunch) await clearDisplayed();
 
     final Option<NotificationAppLaunchDetails> launch = Option.fromNullable(
       await plugin.getNotificationAppLaunchDetails(),
@@ -76,6 +70,35 @@ final class LocalNotificationService {
         .map((final NotificationResponse response) => payloadOf(response))
         .match(() {}, initialNotification.set);
     log.info('Initialized');
+  }
+
+  Future<void> initializeWith(final List<String> candidates) async {
+    try {
+      await plugin.initialize(
+        settings: InitializationSettings(
+          android: AndroidInitializationSettings(candidates.first),
+          iOS: const DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
+          ),
+        ),
+        onDidReceiveNotificationResponse: onTap,
+      );
+    } on PlatformException catch (error) {
+      if (error.code != 'invalid_icon' || candidates.length == 1) rethrow;
+      await initializeWith(candidates.sublist(1));
+    }
+  }
+
+  Future<void> loadExistingChannels() async {
+    try {
+      for (final ChannelSpec channel in await AndroidChannels.existing(plugin)) {
+        categoryChannels.putIfAbsent(channel.id, () => channel);
+      }
+    } on Object catch (error, stackTrace) {
+      log.error('Failed to read the Android channels', error, stackTrace);
+    }
   }
 
   Future<void> registerChannels(final List<ChannelSpec> channels) async {
@@ -111,7 +134,7 @@ final class LocalNotificationService {
       ),
       payload: jsonEncode(content.data),
     );
-    if (config.groupNotifications) await updateGroupSummary();
+    if (config.options.groupNotifications) await updateGroupSummary();
   }
 
   Future<Option<String>> attachmentFor(final int id, final NotificationImage image) async {

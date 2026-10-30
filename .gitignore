@@ -46,3 +46,4 @@ app.*.map.json
 
 resources/
 docs/
+graphify-out/

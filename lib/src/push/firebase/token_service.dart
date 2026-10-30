@@ -16,6 +16,7 @@ final class TokenService {
     required final KitLogger logger,
     this.apnsAttempts = 5,
     this.apnsRetryDelay = const Duration(seconds: 1),
+    this.registerTimeout = const Duration(seconds: 30),
   }) : log = logger.tagged('TokenService');
 
   static const String apnsNotReady = 'APNS_TOKEN_NOT_READY';
@@ -31,16 +32,18 @@ final class TokenService {
 
   final Duration apnsRetryDelay;
 
+  final Duration registerTimeout;
+
   Option<StreamSubscription<String>> refreshSubscription = const None();
 
   void listenForRefresh() {
     refreshSubscription = refreshSubscription.alt(
       () => some(
-        messaging.onTokenRefresh.listen(
+        messaging.onRegistered.listen(
           publish,
           onError:
               (final Object error, final StackTrace stackTrace) =>
-                  log.error('Token refresh stream failed', error, stackTrace),
+                  log.error('Registration stream failed', error, stackTrace),
         ),
       ),
     );
@@ -48,9 +51,17 @@ final class TokenService {
 
   Future<String> getToken() async {
     if (!await apnsReady()) throw const PushException(apnsNotReady);
-    final String token = Option.fromNullable(
-      await messaging.getToken(),
-    ).getOrElse(() => throw const PushException(tokenUnavailable));
+    final Future<String> registered = messaging.onRegistered.first.timeout(
+      registerTimeout,
+      onTimeout: () => throw const PushException(tokenUnavailable),
+    );
+    try {
+      await messaging.register();
+    } on Object {
+      registered.ignore();
+      rethrow;
+    }
+    final String token = await registered;
     publish(token);
     return token;
   }
@@ -59,13 +70,13 @@ final class TokenService {
     try {
       return some(await getToken());
     } on Object catch (error, stackTrace) {
-      log.error('Failed to get FCM token', error, error is PushException ? StackTrace.empty : stackTrace);
+      log.error('Failed to register with FCM', error, error is PushException ? StackTrace.empty : stackTrace);
       return const None();
     }
   }
 
   Future<void> deleteToken() async {
-    await messaging.deleteToken();
+    await messaging.unregister();
     events.forgetToken();
   }
 
