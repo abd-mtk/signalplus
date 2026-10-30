@@ -18,10 +18,8 @@ void openFromNotification(final NotificationPayload payload) {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
   final Either<ServiceFailure, Unit> ready = await SignalPlus.init(
-    const SignalPlusConfig(appId: appId, locale: ServiceLocale.ar, push: PushConfig(requestPermissionOnStartup: false)),
+    const SignalPlusConfig(appId: appId, push: PushConfig(requestPermissionOnStartup: false)),
   );
   ready.match((final ServiceFailure failure) => debugPrint('SignalPlus is off: $failure'), (final Unit _) {});
 

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 import 'package:signalplus/src/signal_plus/background_entry.dart';
 
 import '../support/device_fakes.dart';
@@ -10,23 +11,36 @@ void main() {
 
     await BackgroundSettings.saveConfig(
       store,
-      const PushConfig.resolved(
+      const PushSettings(
         appName: 'App',
-        channelName: 'General',
-        channelDescription: 'D',
-        showNotificationImages: false,
-        groupNotifications: true,
+        locale: ServiceLocale.en,
+        options: PushConfig(showNotificationImages: false, groupNotifications: true),
       ),
     );
-    final PushConfig config = (await BackgroundSettings.readConfig(
+    final PushSettings config = (await BackgroundSettings.readConfig(
       store,
     )).getOrElse(() => throw StateError('no config'));
 
     expect(config.appName, 'App');
-    expect(config.channelId, PushConfig.defaultChannelId);
-    expect(config.showNotificationImages, isFalse);
-    expect(config.groupNotifications, isTrue);
-    expect(config.enableLogs, isTrue);
+    expect(config.locale, ServiceLocale.en);
+    expect(config.channelName, 'General notifications');
+    expect(config.options.showNotificationImages, isFalse);
+    expect(config.options.groupNotifications, isTrue);
+  });
+
+  test('a config saved by 0.1.0 is still read, in Arabic', () async {
+    final MemoryStore store =
+        MemoryStore()
+          ..values[BackgroundSettings.configKey] =
+              '{"AppName":"App","ChannelName":"C","ChannelDescription":"D","Icon":"@mipmap/ic_launcher",'
+              '"Logs":true,"Group":false,"Images":true}';
+
+    final PushSettings config = (await BackgroundSettings.readConfig(
+      store,
+    )).getOrElse(() => throw StateError('no config'));
+
+    expect(config.appName, 'App');
+    expect(config.locale, ServiceLocale.ar);
   });
 
   test('nothing is read when nothing was saved', () async {

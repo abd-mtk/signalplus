@@ -1,48 +1,57 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 
 void main() {
   group('PushConfig', () {
     test('optional values have defaults', () {
-      const PushConfig config = PushConfig.resolved(
-        appName: 'Test App',
-        channelName: 'Test Notifications',
-        channelDescription: 'D',
-      );
+      const PushConfig config = PushConfig();
 
-      expect(config.channelDescription, 'D');
-      expect(config.notificationIcon, '@mipmap/ic_launcher');
-      expect(config.enableLogs, isTrue);
       expect(config.requestPermissionOnStartup, isTrue);
       expect(config.showForegroundNotification, isTrue);
+      expect(config.showNotificationImages, isTrue);
       expect(config.clearNotificationsOnLaunch, isFalse);
       expect(config.groupNotifications, isFalse);
-      expect(config.groupSummary(3), '3');
+    });
+  });
+
+  group('PushSettings', () {
+    test('the channel and the group summary speak the app language', () {
+      const PushSettings arabic = PushSettings(appName: 'A', locale: ServiceLocale.ar);
+      final PushSettings english = arabic.localized(ServiceLocale.en);
+
+      expect(arabic.channelName, 'الإشعارات العامة');
+      expect(arabic.groupSummary(3), 'إشعارات جديدة: 3');
+      expect(english.channelName, 'General notifications');
+      expect(english.groupSummary(1), '1 new notification');
+      expect(english.groupSummary(2), '2 new notifications');
+    });
+
+    test('without a locale the device language is used', () {
+      final TestPlatformDispatcher dispatcher = TestWidgetsFlutterBinding.ensureInitialized().platformDispatcher;
+      addTearDown(dispatcher.clearLocaleTestValue);
+
+      dispatcher.localeTestValue = const Locale('ar', 'IQ');
+      expect(const SignalPlusConfig(appId: 'sdk').language, ServiceLocale.ar);
+
+      dispatcher.localeTestValue = const Locale('fr');
+      expect(const SignalPlusConfig(appId: 'sdk').language, ServiceLocale.en);
+
+      expect(const SignalPlusConfig(appId: 'sdk', locale: Some(ServiceLocale.ar)).language, ServiceLocale.ar);
     });
 
     test('a custom log sink receives the log lines', () {
       final List<String> lines = <String>[];
-      final PushConfig config = PushConfig.resolved(
-        appName: 'A',
-        channelName: 'C',
-        channelDescription: 'D',
+      final SignalPlusConfig config = SignalPlusConfig(
+        appId: 'sdk',
+        locale: const Some(ServiceLocale.ar),
         logger: Some((final String tag, final String message) => lines.add('$tag:$message')),
       );
 
-      config.kitLogger.info('hello');
+      config.settings(appName: 'A').kitLogger.info('hello');
 
       expect(lines, <String>['SignalPlus:hello']);
-    });
-
-    test('the group summary text can be localized', () {
-      final PushConfig config = PushConfig.resolved(
-        appName: 'A',
-        channelName: 'C',
-        channelDescription: 'D',
-        groupSummary: (final int count) => '$count إشعارات جديدة',
-      );
-
-      expect(config.groupSummary(2), '2 إشعارات جديدة');
     });
   });
 

@@ -1,17 +1,14 @@
 import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/core/utils/logger.dart';
 import 'package:signalplus/src/push/models/push_events.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 
-const PushConfig testConfig = PushConfig.resolved(
-  appName: 'Test App',
-  channelName: 'Test Notifications',
-  channelDescription: 'D',
-  enableLogs: false,
-);
+const PushSettings testConfig = PushSettings(appName: 'Test App', locale: ServiceLocale.ar);
 
 const KitLogger silentLogger = KitLogger(sink: KitLogger.silentSink);
 
@@ -32,15 +29,15 @@ PushEvents eventsWith({
 void ignore(final Object? value) {}
 
 class FakeMessaging implements FirebaseMessaging {
-  final refreshController = StreamController<String>.broadcast();
+  final registeredController = StreamController<String>.broadcast();
   String? token = 'token-1234567890';
   List<String?> apnsTokens = ['apns'];
   int apnsCalls = 0;
-  int getTokenCalls = 0;
-  Object? getTokenError;
+  int registerCalls = 0;
+  Object? registerError;
 
   @override
-  Stream<String> get onTokenRefresh => refreshController.stream;
+  Stream<String> get onRegistered => registeredController.stream;
 
   @override
   Future<String?> getAPNSToken() async {
@@ -50,14 +47,14 @@ class FakeMessaging implements FirebaseMessaging {
   }
 
   @override
-  Future<String?> getToken({final String? serviceWorkerScriptPath, final String? vapidKey}) async {
-    getTokenCalls++;
-    if (getTokenError != null) throw getTokenError!;
-    return token;
+  Future<void> register({final String? serviceWorkerScriptPath, final String? vapidKey}) async {
+    registerCalls++;
+    if (registerError != null) throw registerError!;
+    if (token case final String value) registeredController.add(value);
   }
 
   @override
-  Future<void> deleteToken() async => token = null;
+  Future<void> unregister() async => token = null;
 
   RemoteMessage? initialMessage;
   Object? initialMessageError;
@@ -106,6 +103,8 @@ class FakeLocalNotificationsPlugin implements FlutterLocalNotificationsPlugin {
   Object? showError;
   bool cancelledAll = false;
   bool cancelledPending = false;
+  Set<String> invalidIcons = {};
+  final icons = <String>[];
 
   @override
   Future<bool?> initialize({
@@ -113,12 +112,18 @@ class FakeLocalNotificationsPlugin implements FlutterLocalNotificationsPlugin {
     final DidReceiveNotificationResponseCallback? onDidReceiveNotificationResponse,
     final DidReceiveBackgroundNotificationResponseCallback? onDidReceiveBackgroundNotificationResponse,
   }) async {
+    final String icon = settings.android!.defaultIcon;
+    icons.add(icon);
+    if (invalidIcons.contains(icon)) throw PlatformException(code: 'invalid_icon');
     onTap = onDidReceiveNotificationResponse;
     return true;
   }
 
+  FakeAndroidNotifications? android;
+
   @override
-  T? resolvePlatformSpecificImplementation<T extends FlutterLocalNotificationsPlatform>() => null;
+  T? resolvePlatformSpecificImplementation<T extends FlutterLocalNotificationsPlatform>() =>
+      android is T ? android as T : null;
 
   @override
   Future<NotificationAppLaunchDetails?> getNotificationAppLaunchDetails() async => launchDetails;
@@ -166,4 +171,25 @@ NotificationSettings settingsWith(final AuthorizationStatus status) {
     sound: AppleNotificationSetting.enabled,
     providesAppNotificationSettings: AppleNotificationSetting.disabled,
   );
+}
+
+class FakeAndroidNotifications implements AndroidFlutterLocalNotificationsPlugin {
+  final channels = <AndroidNotificationChannel>[];
+  Object? listError;
+
+  @override
+  Future<void> createNotificationChannel(final AndroidNotificationChannel notificationChannel) async {
+    channels
+      ..removeWhere((final AndroidNotificationChannel item) => item.id == notificationChannel.id)
+      ..add(notificationChannel);
+  }
+
+  @override
+  Future<List<AndroidNotificationChannel>?> getNotificationChannels() async {
+    if (listError != null) throw listError!;
+    return channels;
+  }
+
+  @override
+  dynamic noSuchMethod(final Invocation invocation) => super.noSuchMethod(invocation);
 }

@@ -22,6 +22,7 @@ void main() {
       logger: silentLogger,
       apnsAttempts: 3,
       apnsRetryDelay: Duration.zero,
+      registerTimeout: const Duration(milliseconds: 50),
     );
   });
 
@@ -30,7 +31,7 @@ void main() {
     await service.dispose();
   });
 
-  test('a fetched token is published and remembered', () async {
+  test('the id FCM registers is published and remembered', () async {
     expect(await service.getToken(), 'token-1234567890');
 
     expect(tokens, <String>['token-1234567890']);
@@ -40,23 +41,23 @@ void main() {
   test('the same token is never published twice', () async {
     service.listenForRefresh();
     await service.getToken();
-    messaging.refreshController.add('token-1234567890');
+    messaging.registeredController.add('token-1234567890');
     await Future<void>.delayed(Duration.zero);
 
     expect(tokens, <String>['token-1234567890']);
   });
 
-  test('a refreshed token is published', () async {
+  test('a new id FCM registers later is published', () async {
     service.listenForRefresh();
     await service.getToken();
-    messaging.refreshController.add('token-new-0000000');
+    messaging.registeredController.add('token-new-0000000');
     await Future<void>.delayed(Duration.zero);
 
     expect(tokens, <String>['token-1234567890', 'token-new-0000000']);
   });
 
   test('refresh swallows failures and answers nothing', () async {
-    messaging.getTokenError = Exception('offline');
+    messaging.registerError = Exception('offline');
 
     expect(await service.refresh(), const None());
     expect(tokens, isEmpty);
@@ -76,7 +77,7 @@ void main() {
 
     await expectLater(service.getToken(), throwsA(isA<Exception>()));
     expect(messaging.apnsCalls, 3);
-    expect(messaging.getTokenCalls, 0);
+    expect(messaging.registerCalls, 0);
   });
 
   test('Android does not wait for APNs', () async {
@@ -87,7 +88,20 @@ void main() {
     expect(messaging.apnsCalls, 0);
   });
 
-  test('after deleting, the same token is published again', () async {
+  test('a registration that never answers fails with a typed error', () async {
+    messaging.token = null;
+
+    await expectLater(service.getToken(), throwsA(isA<Exception>()));
+    expect(tokens, isEmpty);
+  });
+
+  test('a failed registration reaches the caller', () async {
+    messaging.registerError = StateError('no flag');
+
+    await expectLater(service.getToken(), throwsStateError);
+  });
+
+  test('after unregistering, the same id is published again', () async {
     await service.getToken();
     await service.deleteToken();
     messaging.token = 'token-1234567890';

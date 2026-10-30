@@ -5,8 +5,8 @@ import 'package:fpdart/fpdart.dart';
 
 import '../../core/utils/logger.dart';
 import '../messages/message_mapper.dart';
-import '../models/push_config.dart';
 import '../models/push_events.dart';
+import '../models/push_settings.dart';
 import '../notification/initial_notification.dart';
 import '../notification/local_notification_service.dart';
 
@@ -30,7 +30,7 @@ final class MessagingService {
 
   final Stream<RemoteMessage> onMessageOpenedApp;
 
-  final PushConfig config;
+  final PushSettings config;
 
   final PushEvents events;
 
@@ -72,7 +72,7 @@ final class MessagingService {
   }
 
   bool shouldDisplayInForeground(final RemoteMessage message) =>
-      config.showForegroundNotification && message.needsLocalDisplay(foreground: true);
+      config.options.showForegroundNotification && message.needsLocalDisplay(foreground: true);
 
   void onOpenedApp(final RemoteMessage message) => events.tap(MessageMapper.remote(message, appName: config.appName));
 }

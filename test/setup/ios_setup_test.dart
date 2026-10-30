@@ -1,21 +1,20 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:signalplus/src/setup/ios_service_extension_setup.dart';
+import 'package:signalplus/src/setup/ios_setup.dart';
 
 void main() {
   late Directory app;
   late List<List<String>> calls;
   late List<String> scripts;
 
-  IosServiceExtensionSetup setup({final int exitCode = 0, final String stdout = 'Added', final String stderr = ''}) =>
-      IosServiceExtensionSetup(
-        appRoot: app,
-        run: (final String executable, final List<String> arguments) async {
-          calls.add(<String>[executable, ...arguments]);
-          scripts.add(File(arguments.first).readAsStringSync());
-          return ProcessResult(0, exitCode, stdout, stderr);
-        },
-      );
+  IosSetup setup({final int exitCode = 0, final String stdout = 'Added', final String stderr = ''}) => IosSetup(
+    appRoot: app,
+    run: (final String executable, final List<String> arguments) async {
+      calls.add(<String>[executable, ...arguments]);
+      scripts.add(File(arguments.first).readAsStringSync());
+      return ProcessResult(0, exitCode, stdout, stderr);
+    },
+  );
 
   void createXcodeProject() {
     File('${app.path}/ios/Runner.xcodeproj/project.pbxproj').createSync(recursive: true);
@@ -35,7 +34,7 @@ void main() {
     final result = await setup().setUp();
 
     expect(result.succeeded, isFalse);
-    expect(result.message, contains('ios/Runner.xcodeproj not found'));
+    expect(result.message, IosSetup.missingProject);
     expect(calls, isEmpty);
     expect(Directory('${app.path}/ios/NotificationService').existsSync(), isFalse);
   });
@@ -46,7 +45,7 @@ void main() {
     final result = await setup().setUp();
 
     expect(result.succeeded, isTrue);
-    expect(result.message, 'Added');
+    expect(result.message, 'Added\n${IosSetup.missingGoogleService}');
     expect(extensionFile('NotificationService.swift').readAsStringSync(), startsWith('import UserNotifications'));
     expect(extensionFile('Info.plist').readAsStringSync(), startsWith('<?xml'));
     expect(extensionFile('NotificationService.xcconfig').readAsStringSync(), contains('Generated.xcconfig'));
@@ -54,6 +53,22 @@ void main() {
     expect(calls.single.last, '${app.path}/ios/Runner.xcodeproj');
     expect(scripts.single, contains("require 'xcodeproj'"));
     expect(File(calls.single[1]).existsSync(), isFalse);
+  });
+
+  test('says nothing about Firebase when GoogleService-Info.plist is there', () async {
+    createXcodeProject();
+    File('${app.path}/ios/Runner/GoogleService-Info.plist').createSync(recursive: true);
+
+    expect((await setup().setUp()).message, 'Added');
+  });
+
+  test('the script also turns on Push Notifications and Background Modes', () async {
+    createXcodeProject();
+
+    await setup().setUp();
+
+    expect(scripts.single, contains("'aps-environment'"));
+    expect(scripts.single, contains("'remote-notification'"));
   });
 
   test('keeps sources the app already customized', () async {

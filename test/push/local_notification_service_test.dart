@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/push/messages/message_mapper.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 import 'package:signalplus/src/push/notification/initial_notification.dart';
 import 'package:signalplus/src/push/notification/local_notification_service.dart';
 import 'package:signalplus/src/push/notification/notification_channel.dart';
@@ -25,7 +26,7 @@ void main() {
   late List<String> requestedImages;
 
   LocalNotificationService service({
-    final PushConfig config = testConfig,
+    final PushSettings config = testConfig,
     final Option<NotificationImage> image = const None(),
     final Option<Directory> attachmentDirectory = const None(),
   }) => LocalNotificationService(
@@ -61,7 +62,7 @@ void main() {
       expect(shown.title, 'T');
       expect(jsonDecode(shown.payload!), <String, dynamic>{'route': '/orders'});
       expect(shown.details!.android!.styleInformation, isA<BigTextStyleInformation>());
-      expect(shown.details!.android!.channelId, PushConfig.defaultChannelId);
+      expect(shown.details!.android!.channelId, PushSettings.channelId);
     });
 
     test('Android uses a big picture when the image loads', () async {
@@ -103,12 +104,10 @@ void main() {
     });
 
     test('images are not loaded when they are turned off', () async {
-      const PushConfig config = PushConfig.resolved(
+      const PushSettings config = PushSettings(
         appName: 'A',
-        channelName: 'C',
-        channelDescription: 'D',
-        enableLogs: false,
-        showNotificationImages: false,
+        locale: ServiceLocale.ar,
+        options: PushConfig(showNotificationImages: false),
       );
 
       await service(
@@ -130,7 +129,7 @@ void main() {
 
       expect(plugin.shown.first.details!.android!.channelId, 'Orders');
       expect(plugin.shown.first.details!.android!.channelName, 'الطلبات');
-      expect(plugin.shown.last.details!.android!.channelId, PushConfig.defaultChannelId);
+      expect(plugin.shown.last.details!.android!.channelId, PushSettings.channelId);
     });
 
     test('plugin errors reach the caller', () async {
@@ -141,13 +140,10 @@ void main() {
   });
 
   group('group summary', () {
-    final PushConfig grouped = PushConfig.resolved(
+    const PushSettings grouped = PushSettings(
       appName: 'A',
-      channelName: 'C',
-      channelDescription: 'D',
-      enableLogs: false,
-      groupNotifications: true,
-      groupSummary: (final int count) => '$count جديدة',
+      locale: ServiceLocale.ar,
+      options: PushConfig(groupNotifications: true),
     );
 
     test('counts the grouped notifications actually displayed in the configured words', () async {
@@ -162,7 +158,7 @@ void main() {
 
       final ShownNotification summary = plugin.shown.last;
       expect(summary.id, summaryNotificationId);
-      expect(summary.body, '2 جديدة');
+      expect(summary.body, 'إشعارات جديدة: 2');
       expect(summary.details!.android!.setAsGroupSummary, isTrue);
     });
 
@@ -174,6 +170,26 @@ void main() {
   });
 
   group('initialize', () {
+    test('uses the app notification icon when it ships one', () async {
+      await service().initialize();
+
+      expect(plugin.icons, <String>['@drawable/ic_notification']);
+    });
+
+    test('falls back to the launcher icon when the app has no notification icon', () async {
+      plugin.invalidIcons = <String>{'@drawable/ic_notification'};
+
+      await service().initialize();
+
+      expect(plugin.icons, <String>['@drawable/ic_notification', '@mipmap/ic_launcher']);
+    });
+
+    test('other plugin errors are not swallowed', () async {
+      plugin.invalidIcons = LocalNotificationService.icons.toSet();
+
+      expect(service().initialize(), throwsA(isA<PlatformException>()));
+    });
+
     test('keeps the launch notification instead of tapping it', () async {
       plugin.launchDetails = const NotificationAppLaunchDetails(
         true,
@@ -189,13 +205,47 @@ void main() {
       expect(initial.take().map((final NotificationPayload payload) => payload.data['route']), const Some('/orders'));
     });
 
+    test('in the background a category message uses the channel Android already keeps', () async {
+      plugin.android =
+          FakeAndroidNotifications()
+            ..channels.add(const AndroidNotificationChannel('orders', 'الطلبات', importance: Importance.high));
+      final LocalNotificationService notifications = service();
+
+      await notifications.initialize(background: true);
+      await notifications.show(const NotificationContent(id: 1, title: 'T', body: 'B', channelId: Some('orders')));
+
+      expect(plugin.shown.single.details!.android!.channelId, 'orders');
+      expect(plugin.shown.single.details!.android!.importance, Importance.high);
+    });
+
+    test('a channel registered while running replaces the one read at start', () async {
+      plugin.android = FakeAndroidNotifications()..channels.add(const AndroidNotificationChannel('orders', 'Orders'));
+      final LocalNotificationService notifications = service();
+
+      await notifications.initialize();
+      await notifications.registerChannels(const <ChannelSpec>[
+        ChannelSpec(id: 'orders', name: 'الطلبات', description: 'تحديثات'),
+      ]);
+      await notifications.show(const NotificationContent(id: 1, title: 'T', body: 'B', channelId: Some('orders')));
+
+      expect(plugin.shown.single.details!.android!.channelName, 'الطلبات');
+    });
+
+    test('a failure reading the Android channels does not stop initialize', () async {
+      plugin.android = FakeAndroidNotifications()..listError = PlatformException(code: 'boom');
+      final LocalNotificationService notifications = service();
+
+      await notifications.initialize(background: true);
+      await notifications.show(const NotificationContent(id: 1, title: 'T', body: 'B', channelId: Some('orders')));
+
+      expect(plugin.shown.single.details!.android!.channelId, PushSettings.channelId);
+    });
+
     test('background mode neither reads launch details nor clears', () async {
-      const PushConfig config = PushConfig.resolved(
+      const PushSettings config = PushSettings(
         appName: 'A',
-        channelName: 'C',
-        channelDescription: 'D',
-        enableLogs: false,
-        clearNotificationsOnLaunch: true,
+        locale: ServiceLocale.ar,
+        options: PushConfig(clearNotificationsOnLaunch: true),
       );
       plugin
         ..active = const <ActiveNotification>[ActiveNotification(id: 1)]

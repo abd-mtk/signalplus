@@ -10,8 +10,8 @@ import '../firebase/messaging_service.dart';
 import '../firebase/token_service.dart';
 import '../messages/message_mapper.dart';
 import '../models/notification_payload.dart';
-import '../models/push_config.dart';
 import '../models/push_events.dart';
+import '../models/push_settings.dart';
 import '../notification/initial_notification.dart';
 import '../notification/local_notification_service.dart';
 import '../notification/notification_channel.dart';
@@ -44,7 +44,7 @@ final class SignalPlusInstance implements PushPort {
   final InitialNotificationStore initialNotification;
 
   static Future<SignalPlusInstance> start({
-    required final PushConfig config,
+    required final PushSettings config,
     final Option<FirebaseOptions> firebaseOptions = const None(),
     final Option<BackgroundMessageHandler> backgroundHandler = const None(),
   }) async {
@@ -55,9 +55,9 @@ final class SignalPlusInstance implements PushPort {
 
     final FirebaseMessaging fcm = FirebaseMessaging.instance;
     await fcm.setForegroundNotificationPresentationOptions(
-      alert: config.showForegroundNotification,
-      badge: config.showForegroundNotification,
-      sound: config.showForegroundNotification,
+      alert: config.options.showForegroundNotification,
+      badge: config.options.showForegroundNotification,
+      sound: config.options.showForegroundNotification,
     );
 
     final PushEvents events = PushEvents();
@@ -88,7 +88,7 @@ final class SignalPlusInstance implements PushPort {
     );
 
     unawaited(tokens.refresh());
-    if (config.requestPermissionOnStartup) unawaited(permissions.requestPermission());
+    if (config.options.requestPermissionOnStartup) unawaited(permissions.requestPermission());
 
     logger.info('Started');
     return SignalPlusInstance(
@@ -102,7 +102,7 @@ final class SignalPlusInstance implements PushPort {
   }
 
   /// Shows a data-only message from the background isolate.
-  static Future<void> showBackgroundMessage(final RemoteMessage message, {required final PushConfig config}) async {
+  static Future<void> showBackgroundMessage(final RemoteMessage message, {required final PushSettings config}) async {
     if (!message.needsLocalDisplay(foreground: false)) return;
 
     final KitLogger logger = config.kitLogger;

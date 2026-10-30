@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/push/firebase/messaging_service.dart';
 import 'package:signalplus/src/push/models/push_events.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 import 'package:signalplus/src/push/notification/initial_notification.dart';
 import 'package:signalplus/src/push/notification/local_notification_service.dart';
 
@@ -32,7 +33,7 @@ void main() {
   late PushEvents events;
   late MessagingService service;
 
-  MessagingService build({final PushConfig config = testConfig}) => MessagingService(
+  MessagingService build({final PushSettings config = testConfig}) => MessagingService(
     messaging: fcm,
     config: config,
     events: events,
@@ -102,12 +103,10 @@ void main() {
 
     test('nothing is shown when foreground display is off', () async {
       service = build(
-        config: const PushConfig.resolved(
+        config: const PushSettings(
           appName: 'A',
-          channelName: 'C',
-          channelDescription: 'D',
-          enableLogs: false,
-          showForegroundNotification: false,
+          locale: ServiceLocale.ar,
+          options: PushConfig(showForegroundNotification: false),
         ),
       );
       await service.setupListeners();

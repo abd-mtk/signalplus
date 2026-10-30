@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/api/signalplus_client.dart';
 import 'package:signalplus/src/core/errors/exceptions.dart';
 import 'package:signalplus/src/device/fresh_install.dart';
 import 'package:signalplus/src/device/installation_id_store.dart';
+import 'package:signalplus/src/push/models/push_settings.dart';
 import 'package:signalplus/src/push/notification/notification_channel.dart';
 import 'package:signalplus/src/signal_plus/background_entry.dart';
 import 'package:signalplus/src/signal_plus/signal_plus_runtime.dart';
@@ -14,13 +16,13 @@ import 'package:signalplus/src/signal_plus/signal_plus_state.dart';
 import 'support/api_harness.dart';
 import 'support/device_fakes.dart';
 
-const PushConfig pushConfig = PushConfig(enableLogs: false);
+void silent(final String tag, final String message) {}
 
 const SignalPlusConfig config = SignalPlusConfig(
   appId: ApiHarness.appId,
-  locale: ServiceLocale.ar,
-  push: pushConfig,
+  locale: Some(ServiceLocale.ar),
   registerOnStart: false,
+  logger: Some(silent),
 );
 
 Map<String, dynamic> view(final String id, {final Object? externalId}) => <String, dynamic>{
@@ -31,6 +33,8 @@ Map<String, dynamic> view(final String id, {final Object? externalId}) => <Strin
 };
 
 const String register1 = 'PUT /sdk/v1/installations/install-1';
+
+const String categoriesRoute = 'GET /sdk/v1/categories';
 
 void main() {
   late ApiHarness harness;
@@ -45,6 +49,7 @@ void main() {
   void start() => SignalPlusState.attach(
     SignalPlusRuntime(
       config: config,
+      settings: config.settings(appName: 'Shop'),
       push: push,
       client: harness.client,
       installationIds: idStore(),
@@ -75,7 +80,7 @@ void main() {
     listeners = <StreamSubscription<Object>>[];
     await SignalPlusState.reset(secureStore: secure, localStore: local);
     SignalPlusState.launchScheduler = (final void Function() run) => run();
-    SignalPlusState.startPush = (final SignalPlusConfig _) async => push;
+    SignalPlusState.startPush = (final SignalPlusConfig _, final PushSettings _) async => push;
     SignalPlusState.createClient = (final SignalPlusConfig _) => harness.client;
     SignalPlusState.createDevice = (final SignalPlusConfig _) => const FixedDevice();
     SignalPlusState.installationIds = idStore();
@@ -89,7 +94,7 @@ void main() {
   group('init', () {
     test('starts the push side once, saves the display config and attaches', () async {
       int starts = 0;
-      SignalPlusState.startPush = (final SignalPlusConfig _) async {
+      SignalPlusState.startPush = (final SignalPlusConfig _, final PushSettings _) async {
         starts++;
         return push;
       };
@@ -104,28 +109,61 @@ void main() {
       expect(starts, 1);
       expect(SignalPlus.isInitialized, isTrue);
       expect(secure.values[BackgroundSettings.configKey], contains('"AppName":"Shop"'));
-      expect(secure.values[BackgroundSettings.configKey], contains('"ChannelName":"الإشعارات العامة"'));
+      expect(secure.values[BackgroundSettings.configKey], contains('"Locale":"ar"'));
+      expect(routes().where((final String route) => route != categoriesRoute), isEmpty);
+    });
+
+    test('on Android init creates one channel per category by itself', () async {
+      harness.on(categoriesRoute, StubResponse.data(fixture('categories')));
+
+      await SignalPlus.init(config);
+      await pumpEventQueue();
+
+      expect(routes(), <String>[categoriesRoute]);
+      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
+    });
+
+    test('on iOS init fetches no categories, since there are no channels', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      await SignalPlus.init(config);
+      await pumpEventQueue();
+
       expect(routes(), isEmpty);
+      expect(push.channels, isEmpty);
+    });
+
+    test('a failed category fetch does not fail init', () async {
+      harness.on(categoriesRoute, StubResponse.failure(500, <String>['InternalError']));
+
+      expect((await SignalPlus.init(config)).isRight(), isTrue);
+      await pumpEventQueue();
+
+      expect(SignalPlus.isInitialized, isTrue);
+      expect(push.channels, isEmpty);
     });
 
     test('registers the device by itself when registerOnStart is on', () async {
       await SignalPlus.init(
-        const SignalPlusConfig(appId: ApiHarness.appId, locale: ServiceLocale.ar, push: pushConfig),
+        const SignalPlusConfig(appId: ApiHarness.appId, locale: Some(ServiceLocale.ar), logger: Some(silent)),
       );
       await pumpEventQueue();
 
-      expect(routes(), <String>[register1]);
+      expect(routes(), containsAll(<String>[register1, categoriesRoute]));
+      expect(routes().where((final String route) => route == register1), hasLength(1));
       expect(secure.values[InstallationIdStore.key], 'install-1');
     });
 
     test('a failed start answers Left and can be tried again', () async {
-      SignalPlusState.startPush = (final SignalPlusConfig _) async => throw StateError('no firebase');
+      SignalPlusState.startPush =
+          (final SignalPlusConfig _, final PushSettings _) async => throw StateError('no firebase');
 
       final ServiceFailure failure = leftOf(await SignalPlus.init(config));
       expect(failure.operation, Operations.init);
       expect(SignalPlus.isInitialized, isFalse);
 
-      SignalPlusState.startPush = (final SignalPlusConfig _) async => push;
+      SignalPlusState.startPush = (final SignalPlusConfig _, final PushSettings _) async => push;
       expect((await SignalPlus.init(config)).isRight(), isTrue);
     });
 
@@ -407,17 +445,17 @@ void main() {
 
   group('display', () {
     test('init takes the app name from the app and names the default channel in its language', () async {
-      Option<PushConfig> started = const None();
-      SignalPlusState.startPush = (final SignalPlusConfig value) async {
-        started = some(value.push);
+      Option<PushSettings> started = const None();
+      SignalPlusState.startPush = (final SignalPlusConfig _, final PushSettings value) async {
+        started = some(value);
         return push;
       };
 
       await SignalPlus.init(config);
 
-      final PushConfig display = started.getOrElse(() => throw StateError('push did not start'));
+      final PushSettings display = started.getOrElse(() => throw StateError('push did not start'));
       expect(display.appName, 'Shop');
-      expect(display.channelId, PushConfig.defaultChannelId);
+      expect(display.locale, ServiceLocale.ar);
       expect(display.channelName, 'الإشعارات العامة');
       expect(display.channelDescription, 'إشعارات التطبيق العامة');
     });
@@ -432,11 +470,11 @@ void main() {
 
         await SignalPlus.setLocale(ServiceLocale.en);
 
-        expect(push.channels.first.id, PushConfig.defaultChannelId);
+        expect(push.channels.first.id, PushSettings.channelId);
         expect(push.channels.first.name, 'General notifications');
         expect(push.channels.skip(1).map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
         expect(harness.last.headers['Accept-Language'], 'en');
-        expect(secure.values[BackgroundSettings.configKey], contains('"ChannelName":"General notifications"'));
+        expect(secure.values[BackgroundSettings.configKey], contains('"Locale":"en"'));
       },
     );
   });

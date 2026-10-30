@@ -8,7 +8,7 @@ import '../core/kits/domain_kit.dart';
 import '../core/storage/key_value_store.dart';
 import '../core/utils/json_reader.dart';
 import '../push/bootstrap/signalplus_instance.dart';
-import '../push/models/push_config.dart';
+import '../push/models/push_settings.dart';
 
 typedef BackgroundHandler = Future<void> Function(RemoteMessage message);
 
@@ -22,13 +22,13 @@ abstract final class BackgroundSettings {
     details: 'The background handler must be a top-level or static function.',
   );
 
-  static Future<void> saveConfig(final KeyValueStore store, final PushConfig config) =>
+  static Future<void> saveConfig(final KeyValueStore store, final PushSettings config) =>
       store.write(configKey, jsonEncode(config.toJson()));
 
-  static Future<Option<PushConfig>> readConfig(final KeyValueStore store) async =>
+  static Future<Option<PushSettings>> readConfig(final KeyValueStore store) async =>
       (await store.read(configKey)).flatMap((final String raw) {
         try {
-          return some(PushConfig.fromJson(JsonReader.object(jsonDecode(raw))));
+          return some(PushSettings.fromJson(JsonReader.object(jsonDecode(raw))));
         } on Object {
           return const None();
         }
@@ -63,9 +63,10 @@ Future<void> signalPlusBackgroundEntry(final RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
   const KeyValueStore store = SecureKeyValueStore();
-  await (await BackgroundSettings.readConfig(
-    store,
-  )).match(() async {}, (final PushConfig config) => SignalPlusInstance.showBackgroundMessage(message, config: config));
+  await (await BackgroundSettings.readConfig(store)).match(
+    () async {},
+    (final PushSettings config) => SignalPlusInstance.showBackgroundMessage(message, config: config),
+  );
   await (await BackgroundSettings.readHandler(
     store,
   )).match(() async {}, (final BackgroundHandler handler) => handler(message));
