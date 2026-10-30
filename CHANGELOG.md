@@ -1,3 +1,8 @@
+## 0.2.1
+
+* The default channel is named `General` / `عامة`, with the description `General App Notifications` / `إشعارات التطبيق العامة`.
+* The English group summary reads `1 New Notification` / `3 New Notifications`.
+
 ## 0.2.0
 
 Less to configure: the package works out what it can by itself.

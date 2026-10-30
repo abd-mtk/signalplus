@@ -21,11 +21,11 @@ void main() {
       const PushSettings arabic = PushSettings(appName: 'A', locale: ServiceLocale.ar);
       final PushSettings english = arabic.localized(ServiceLocale.en);
 
-      expect(arabic.channelName, 'الإشعارات العامة');
+      expect(arabic.channelName, 'عامة');
       expect(arabic.groupSummary(3), 'إشعارات جديدة: 3');
-      expect(english.channelName, 'General notifications');
-      expect(english.groupSummary(1), '1 new notification');
-      expect(english.groupSummary(2), '2 new notifications');
+      expect(english.channelName, 'General');
+      expect(english.groupSummary(1), '1 New Notification');
+      expect(english.groupSummary(2), '2 New Notifications');
     });
 
     test('without a locale the device language is used', () {

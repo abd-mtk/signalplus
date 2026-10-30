@@ -34,18 +34,18 @@ final class PushSettings {
   final Option<LogSink> logger;
 
   String get channelName => switch (locale) {
-    ServiceLocale.ar => 'الإشعارات العامة',
-    ServiceLocale.en => 'General notifications',
+    ServiceLocale.ar => 'عامة',
+    ServiceLocale.en => 'General',
   };
 
   String get channelDescription => switch (locale) {
     ServiceLocale.ar => 'إشعارات التطبيق العامة',
-    ServiceLocale.en => 'General app notifications',
+    ServiceLocale.en => 'General App Notifications',
   };
 
   String groupSummary(final int count) => switch (locale) {
     ServiceLocale.ar => 'إشعارات جديدة: $count',
-    ServiceLocale.en => count == 1 ? '1 new notification' : '$count new notifications',
+    ServiceLocale.en => count == 1 ? '1 New Notification' : '$count New Notifications',
   };
 
   KitLogger get kitLogger => KitLogger.of(logger);
