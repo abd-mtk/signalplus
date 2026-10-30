@@ -23,7 +23,7 @@ void main() {
 
     expect(config.appName, 'App');
     expect(config.locale, ServiceLocale.en);
-    expect(config.channelName, 'General notifications');
+    expect(config.channelName, 'General');
     expect(config.options.showNotificationImages, isFalse);
     expect(config.options.groupNotifications, isTrue);
   });

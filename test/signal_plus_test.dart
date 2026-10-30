@@ -456,7 +456,7 @@ void main() {
       final PushSettings display = started.getOrElse(() => throw StateError('push did not start'));
       expect(display.appName, 'Shop');
       expect(display.locale, ServiceLocale.ar);
-      expect(display.channelName, 'الإشعارات العامة');
+      expect(display.channelName, 'عامة');
       expect(display.channelDescription, 'إشعارات التطبيق العامة');
     });
 
@@ -471,7 +471,7 @@ void main() {
         await SignalPlus.setLocale(ServiceLocale.en);
 
         expect(push.channels.first.id, PushSettings.channelId);
-        expect(push.channels.first.name, 'General notifications');
+        expect(push.channels.first.name, 'General');
         expect(push.channels.skip(1).map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
         expect(harness.last.headers['Accept-Language'], 'en');
         expect(secure.values[BackgroundSettings.configKey], contains('"Locale":"en"'));
