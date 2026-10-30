@@ -101,6 +101,13 @@ final class LocalNotificationService {
     }
   }
 
+  /// Deletes the channels among [ids] that Android has, so no channel is deleted that never existed.
+  Future<void> deleteChannels(final List<String> ids) async {
+    final List<String> existing = ids.where(categoryChannels.containsKey).toList();
+    await AndroidChannels.delete(plugin, existing);
+    existing.forEach(categoryChannels.remove);
+  }
+
   Future<void> registerChannels(final List<ChannelSpec> channels) async {
     await AndroidChannels.create(plugin, channels);
     for (final ChannelSpec channel in channels) {

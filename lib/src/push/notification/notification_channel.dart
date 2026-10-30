@@ -49,6 +49,13 @@ abstract final class AndroidChannels {
     ],
   );
 
+  static Future<void> delete(final FlutterLocalNotificationsPlugin plugin, final List<String> ids) =>
+      of(plugin).match(() async {}, (final AndroidFlutterLocalNotificationsPlugin platform) async {
+        for (final String id in ids) {
+          await platform.deleteNotificationChannel(channelId: id);
+        }
+      });
+
   static Future<void> create(final FlutterLocalNotificationsPlugin plugin, final List<ChannelSpec> channels) async {
     await of(plugin).match(() async {}, (final AndroidFlutterLocalNotificationsPlugin platform) async {
       for (final ChannelSpec channel in channels) {

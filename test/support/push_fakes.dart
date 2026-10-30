@@ -184,6 +184,14 @@ class FakeAndroidNotifications implements AndroidFlutterLocalNotificationsPlugin
       ..add(notificationChannel);
   }
 
+  final deleted = <String>[];
+
+  @override
+  Future<void> deleteNotificationChannel({required final String channelId}) async {
+    deleted.add(channelId);
+    channels.removeWhere((final AndroidNotificationChannel item) => item.id == channelId);
+  }
+
   @override
   Future<List<AndroidNotificationChannel>?> getNotificationChannels() async {
     if (listError != null) throw listError!;

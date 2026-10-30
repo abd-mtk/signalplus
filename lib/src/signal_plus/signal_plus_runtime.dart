@@ -123,8 +123,13 @@ final class SignalPlusRuntime {
     if (!createChannels) return result;
     return result.match(Left.new, (final List<CategoryEntity> categories) async {
       final Either<ServiceFailure, Unit> created = await guard(() async {
+        final List<CategoryEntity> general = categories.where(isGeneral).toList();
+        await push.deleteChannels(<String>[
+          for (final CategoryEntity category in general)
+            if (category.channelId != PushSettings.channelId) category.channelId,
+        ]);
         await push.registerChannels(<ChannelSpec>[
-          for (final CategoryEntity category in categories)
+          for (final CategoryEntity category in categories.where((final CategoryEntity item) => !isGeneral(item)))
             ChannelSpec(
               id: category.channelId,
               name: category.name,
@@ -138,6 +143,21 @@ final class SignalPlusRuntime {
       return created.map((final Unit _) => categories);
     });
   }
+
+  /// A category that means the same as the default channel shares it, so Android does not list "General" twice.
+  /// What the service sends to its own channel id falls back to the default channel, which the manifest names.
+  bool isGeneral(final CategoryEntity category) {
+    final Set<String> names = <String>{
+      for (final ServiceLocale language in ServiceLocale.values) settings.localized(language).channelName.toLowerCase(),
+    };
+    return <String>{
+          category.key,
+          category.channelId,
+        }.any((final String id) => id.toLowerCase() == generalKey || id == PushSettings.channelId) ||
+        names.contains(category.name.trim().toLowerCase());
+  }
+
+  static const String generalKey = 'general';
 
   /// One Android channel per category, brought in line with the dashboard on every start.
   Future<void> syncChannels() async {

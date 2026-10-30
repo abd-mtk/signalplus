@@ -123,6 +123,48 @@ void main() {
       expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
     });
 
+    test('a General category shares the default channel instead of adding a second one', () async {
+      harness.on(
+        categoriesRoute,
+        StubResponse.data(<Map<String, dynamic>>[
+          <String, dynamic>{
+            'Key': 'General',
+            'AndroidChannelId': 'general',
+            'Name': 'عام',
+            'Lane': 'Bulk',
+            'Locked': false,
+            'DefaultEnabled': true,
+          },
+          <String, dynamic>{
+            'Key': 'News',
+            'AndroidChannelId': 'news',
+            'Name': 'الإشعارات العامة',
+            'Lane': 'Bulk',
+            'Locked': false,
+            'DefaultEnabled': true,
+          },
+          <String, dynamic>{
+            'Key': 'Orders',
+            'AndroidChannelId': 'orders',
+            'Name': 'الطلبات',
+            'Lane': 'Critical',
+            'Locked': false,
+            'DefaultEnabled': true,
+          },
+        ]),
+      );
+
+      await SignalPlus.init(config);
+      await pumpEventQueue();
+
+      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['orders']);
+      expect(push.deletedChannels, <String>['general', 'news']);
+      expect(
+        (await SignalPlus.categories(createChannels: false)).map((final List<CategoryEntity> items) => items.length),
+        const Right<ServiceFailure, int>(3),
+      );
+    });
+
     test('on iOS init fetches no categories, since there are no channels', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
