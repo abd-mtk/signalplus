@@ -231,6 +231,19 @@ void main() {
       expect(plugin.shown.single.details!.android!.channelName, 'الطلبات');
     });
 
+    test('only channels Android has are deleted, and they stop being used', () async {
+      final FakeAndroidNotifications android =
+          plugin.android = FakeAndroidNotifications()..channels.add(const AndroidNotificationChannel('general', 'عام'));
+      final LocalNotificationService notifications = service();
+      await notifications.initialize();
+
+      await notifications.deleteChannels(const <String>['general', 'never-created']);
+      await notifications.show(const NotificationContent(id: 1, title: 'T', body: 'B', channelId: Some('general')));
+
+      expect(android.deleted, <String>['general']);
+      expect(plugin.shown.single.details!.android!.channelId, PushSettings.channelId);
+    });
+
     test('a failure reading the Android channels does not stop initialize', () async {
       plugin.android = FakeAndroidNotifications()..listError = PlatformException(code: 'boom');
       final LocalNotificationService notifications = service();

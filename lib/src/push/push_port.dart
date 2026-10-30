@@ -20,6 +20,8 @@ abstract class PushPort {
 
   Future<void> registerChannels(final List<ChannelSpec> channels);
 
+  Future<void> deleteChannels(final List<String> ids);
+
   Future<void> clearNotifications();
 
   /// The tap that launched the app, or one that arrived before a listener existed.

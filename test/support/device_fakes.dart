@@ -69,6 +69,11 @@ final class FakePushPort implements PushPort {
   @override
   Future<void> registerChannels(final List<ChannelSpec> value) async => channels.addAll(value);
 
+  final List<String> deletedChannels = <String>[];
+
+  @override
+  Future<void> deleteChannels(final List<String> ids) async => deletedChannels.addAll(ids);
+
   @override
   Future<void> clearNotifications() async => cleared = true;
 

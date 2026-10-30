@@ -1,3 +1,7 @@
+## 0.2.3
+
+* A category that means the same as the default channel (key or channel id `general`, or the default channel's name) shares it instead of adding a second "General" to the Android settings. A duplicate channel an earlier version created is deleted.
+
 ## 0.2.2
 
 * The default channel is named `General Notifications` / `الإشعارات العامة` again.

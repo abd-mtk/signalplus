@@ -136,6 +136,9 @@ final class SignalPlusInstance implements PushPort {
   Future<void> registerChannels(final List<ChannelSpec> channels) => notifications.registerChannels(channels);
 
   @override
+  Future<void> deleteChannels(final List<String> ids) => notifications.deleteChannels(ids);
+
+  @override
   Future<void> clearNotifications() => notifications.clearDisplayed();
 
   @override
