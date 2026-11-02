@@ -17,6 +17,41 @@ void main() {
       preferences.quietHours.map((final QuietHoursEntity hours) => hours.props).toNullable(),
       const QuietHoursEntity(start: '22:00', end: '07:00', days: <WeekDay>[WeekDay.fri, WeekDay.sat]).props,
     );
+    expect(preferences.categories.map((final CategoryPreferenceEntity category) => category.description), <Object>[
+      const Some('تحديثات الطلب'),
+      const None(),
+    ]);
+    expect(preferences.muted, isFalse);
+  });
+
+  test('a service without Muted reads as not muted', () async {
+    final ApiHarness harness = ApiHarness();
+    harness.on(
+      'GET /sdk/v1/installations/i-1/recipient/preferences',
+      StubResponse.data(<String, dynamic>{'Categories': <dynamic>[], 'QuietHours': null}),
+    );
+
+    expect(rightOf(await harness.client.preferences.getPreferences(ApiHarness.device)).muted, isFalse);
+  });
+
+  test('muting and unmuting answer the settings with Muted', () async {
+    final ApiHarness harness = ApiHarness();
+    harness.on(
+      'PUT /sdk/v1/installations/i-1/recipient/mute',
+      StubResponse.data(<String, dynamic>{'Muted': true, 'Categories': <dynamic>[], 'QuietHours': null}),
+    );
+    harness.on(
+      'DELETE /sdk/v1/installations/i-1/recipient/mute',
+      StubResponse.data(<String, dynamic>{'Muted': false, 'Categories': <dynamic>[], 'QuietHours': null}),
+    );
+
+    expect(rightOf(await harness.client.preferences.muteAll(ApiHarness.device)).muted, isTrue);
+    expect(harness.last.json, isNull);
+    expect(rightOf(await harness.client.preferences.unmuteAll(ApiHarness.device)).muted, isFalse);
+    expect(harness.routesCalled, <String>[
+      'PUT /sdk/v1/installations/i-1/recipient/mute',
+      'DELETE /sdk/v1/installations/i-1/recipient/mute',
+    ]);
   });
 
   test('updating reports locked and unknown categories as rejected', () async {

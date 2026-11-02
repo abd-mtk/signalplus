@@ -7,7 +7,6 @@ abstract final class CategoryModel {
     final JsonMap json = JsonReader.object(item, 'Category');
     return CategoryEntity(
       key: JsonReader.string(json, 'Key'),
-      androidChannelId: JsonReader.optString(json, 'AndroidChannelId').filter((final String id) => id.isNotEmpty),
       name: JsonReader.string(json, 'Name'),
       description: JsonReader.optString(json, 'Description'),
       lane: Lane.parse(JsonReader.string(json, 'Lane')),

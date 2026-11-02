@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/api/domain/entities/device_auth.dart';
+import 'package:signalplus/src/api/domain/entities/enums.dart';
 import 'package:signalplus/src/api/domain/entities/installation.dart';
+
 import '../support/api_harness.dart';
 
 const RegisterInstallationEntity registration = RegisterInstallationEntity(

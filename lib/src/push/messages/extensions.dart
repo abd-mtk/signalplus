@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -19,35 +17,32 @@ extension RemoteMessageX on RemoteMessage {
   bool needsLocalDisplay({required final bool foreground}) =>
       isDataOnly || (foreground && defaultTargetPlatform.isAndroid);
 
-  Option<String> get dataTitle => data.textAt(MessageKeys.title);
+  Option<String> get dataTitle => data.nonEmptyTextAt(MessageKeys.title);
 
-  Option<String> get dataBody => data.textAt(MessageKeys.body);
+  Option<String> get dataBody => data.nonEmptyTextAt(MessageKeys.body);
 
-  Option<String> get imageUrl => <Option<String>>[
-        notificationBlock.flatMap(
-          (final RemoteNotification block) => Option.fromNullable(
-            block.android,
-          ).flatMap((final AndroidNotification android) => Option.fromNullable(android.imageUrl)),
-        ),
-        notificationBlock.flatMap(
-          (final RemoteNotification block) => Option.fromNullable(
-            block.apple,
-          ).flatMap((final AppleNotification apple) => Option.fromNullable(apple.imageUrl)),
-        ),
-        data.textAt(MessageKeys.image),
-      ]
-      .map((final Option<String> url) => url.filter((final String value) => value.isWebUrl))
-      .firstWhere((final Option<String> url) => url.isSome(), orElse: () => const None());
+  Option<String> get imageUrl =>
+      <Option<String>>[
+            notificationBlock.flatMap(
+              (final RemoteNotification block) => Option.fromNullable(
+                block.android,
+              ).flatMap((final AndroidNotification android) => Option.fromNullable(android.imageUrl)),
+            ),
+            notificationBlock.flatMap(
+              (final RemoteNotification block) => Option.fromNullable(
+                block.apple,
+              ).flatMap((final AppleNotification apple) => Option.fromNullable(apple.imageUrl)),
+            ),
+            data.textAt(MessageKeys.image),
+          ]
+          .map((final Option<String> url) => url.filter((final String value) => value.isWebUrl))
+          .firstWhere((final Option<String> url) => url.isSome(), orElse: () => const None());
 
   Option<String> get androidChannelId => notificationBlock.flatMap(
     (final RemoteNotification block) => Option.fromNullable(
       block.android,
     ).flatMap((final AndroidNotification android) => Option.fromNullable(android.channelId)),
   );
-}
-
-extension FirebaseMessagingX on FirebaseMessaging {
-  Future<bool> get hasApnsToken async => Option.fromNullable(await getAPNSToken()).isSome();
 }
 
 extension TargetPlatformX on TargetPlatform {
@@ -74,25 +69,14 @@ extension MapValuesX on Map<dynamic, dynamic> {
   };
 
   Option<String> nonEmptyTextAt(final Object key) => textAt(key).filter((final String text) => text.isNotEmpty);
-
-  Map<dynamic, dynamic> mapAt(final Object key) => switch (this[key]) {
-    final Map<dynamic, dynamic> map => map,
-    _ => const <dynamic, dynamic>{},
-  };
 }
 
 extension StringX on String {
-  bool get isWebUrl => Option.fromNullable(Uri.tryParse(this)).exists((final Uri uri) => uri.isWeb);
+  bool get isWebUrl => Option.fromNullable(
+    Uri.tryParse(this),
+  ).exists((final Uri uri) => uri.host.isNotEmpty && (uri.isScheme('http') || uri.isScheme('https')));
 
   String get masked => length > 8 ? '${substring(0, 8)}…' : '***';
-}
-
-extension UriX on Uri {
-  bool get isWeb => host.isNotEmpty && (isScheme('http') || isScheme('https'));
-}
-
-extension HttpClientResponseX on HttpClientResponse {
-  bool get isOk => statusCode == HttpStatus.ok;
 }
 
 extension ActiveNotificationX on ActiveNotification {

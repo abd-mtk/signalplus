@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'signalplus'
-  s.version          = '1.0.0'
+  s.version          = '0.5.0'
   s.summary          = 'Makes FlutterAppDelegate the notification center delegate for signalplus.'
   s.description      = 'Makes FlutterAppDelegate the notification center delegate for signalplus.'
   s.homepage         = 'https://github.com/abd-mtk/signalplus'

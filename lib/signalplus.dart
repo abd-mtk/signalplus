@@ -3,8 +3,7 @@ export 'package:firebase_messaging/firebase_messaging.dart' show RemoteMessage;
 export 'package:fpdart/fpdart.dart' hide State;
 
 export 'src/api/domain/entities/catalog.dart' show CategoryEntity;
-export 'src/api/domain/entities/enums.dart'
-    show DeliveryEventType, DevicePlatform, Lane, PushPermission, ServiceLocale, TokenStatus, WeekDay;
+export 'src/api/domain/entities/enums.dart' show Lane, PushPermission, ServiceLocale, TokenStatus, WeekDay;
 export 'src/api/domain/entities/installation.dart' show SdkInstallationEntity;
 export 'src/api/domain/entities/preferences.dart'
     show

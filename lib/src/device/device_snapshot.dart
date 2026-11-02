@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../api/domain/entities/enums.dart';
 import '../core/kits/domain_kit.dart';
 import '../core/utils/logger.dart';
+import '../core/utils/memo.dart';
 
 final class DeviceSnapshot extends Equatable {
   const DeviceSnapshot({
@@ -42,23 +43,16 @@ abstract class DeviceSnapshotReader {
 }
 
 final class PlatformDeviceSnapshotReader implements DeviceSnapshotReader {
-  PlatformDeviceSnapshotReader({
-    this.fallbackTimeZone = 'UTC',
-    this.logger = const KitLogger(sink: KitLogger.silentSink),
-  });
+  PlatformDeviceSnapshotReader({this.logger = const KitLogger(sink: KitLogger.silentSink)});
 
-  final String fallbackTimeZone;
+  static const String fallbackTimeZone = 'UTC';
 
   final KitLogger logger;
 
-  Option<Future<DeviceSnapshot>> cached = const None();
+  final Memo<DeviceSnapshot> cached = Memo<DeviceSnapshot>();
 
   @override
-  Future<DeviceSnapshot> read() => cached.getOrElse(() {
-    final Future<DeviceSnapshot> loaded = load();
-    cached = some(loaded);
-    return loaded;
-  });
+  Future<DeviceSnapshot> read() => cached(load);
 
   Future<DeviceSnapshot> load() async {
     final PackageInfo package = await PackageInfo.fromPlatform();

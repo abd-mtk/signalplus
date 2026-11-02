@@ -60,7 +60,7 @@ final class ApiHttpClient {
       ..headers.addAll(headersFor(request));
     request.body.match(() {}, (final Object body) => outgoing.body = jsonEncode(body));
     try {
-      return decode(await http.Response.fromStream(await client.send(outgoing).timeout(config.timeout)));
+      return decode(await client.send(outgoing).then(http.Response.fromStream).timeout(config.timeout));
     } on TimeoutException {
       throw NetworkException('${request.verb.name.toUpperCase()} ${uri.path} timed out', timedOut: true);
     } on http.ClientException catch (error) {

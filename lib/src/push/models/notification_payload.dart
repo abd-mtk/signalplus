@@ -16,20 +16,11 @@ final class NotificationPayload extends Equatable {
     final Map<String, dynamic> map, {
     final String defaultTitle = '',
     final String defaultBody = '',
-  }) {
-    final Map<dynamic, dynamic> nested = map.mapAt(MessageKeys.notification);
-    return NotificationPayload(
-      title: map
-          .nonEmptyTextAt(MessageKeys.title)
-          .alt(() => nested.nonEmptyTextAt(MessageKeys.title))
-          .getOrElse(() => defaultTitle),
-      body: map
-          .nonEmptyTextAt(MessageKeys.body)
-          .alt(() => nested.nonEmptyTextAt(MessageKeys.body))
-          .getOrElse(() => defaultBody),
-      data: map,
-    );
-  }
+  }) => NotificationPayload(
+    title: map.nonEmptyTextAt(MessageKeys.title).getOrElse(() => defaultTitle),
+    body: map.nonEmptyTextAt(MessageKeys.body).getOrElse(() => defaultBody),
+    data: map,
+  );
 
   final String title;
 

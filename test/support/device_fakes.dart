@@ -1,4 +1,5 @@
 import 'package:signalplus/signalplus.dart';
+import 'package:signalplus/src/api/domain/entities/enums.dart';
 import 'package:signalplus/src/core/storage/key_value_store.dart';
 import 'package:signalplus/src/device/device_snapshot.dart';
 import 'package:signalplus/src/push/models/push_events.dart';
@@ -11,8 +12,13 @@ final class MemoryStore implements KeyValueStore {
   @override
   Future<Option<String>> read(final String key) async => Option.fromNullable(values[key]);
 
+  bool failWrites = false;
+
   @override
-  Future<void> write(final String key, final String value) async => values[key] = value;
+  Future<void> write(final String key, final String value) async {
+    if (failWrites) throw StateError('storage unavailable');
+    values[key] = value;
+  }
 }
 
 final class FixedDevice implements DeviceSnapshotReader {

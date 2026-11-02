@@ -83,7 +83,7 @@ Future<void> main() async {
 }
 ```
 
-`init` sets up Firebase and the notification channels, asks for permission, and registers the device. On Android it also creates one channel per category from the dashboard, on every start, so new categories and renamed ones reach the app without an update. Notifications show by themselves in every state: open, in the background, or closed. From then on the device keeps itself up to date: every new Firebase Installation ID or permission change registers it again by itself.
+`init` sets up Firebase and the notification channels, asks for permission, and registers the device. On Android it also creates one channel per category from the dashboard, on every start, so new categories and renamed ones reach the app without an update, and the channel of a deleted category is removed. Channels your app creates itself are never touched. Notifications show by themselves in every state: open, in the background, or closed. From then on the device keeps itself up to date: every new Firebase Installation ID or permission change registers it again by itself.
 
 The device registers with FCM by its Firebase Installation ID (`register` / `onRegistered`), not by the deprecated FCM token. On Android the package turns this on in its own manifest, so your app must not call `FirebaseMessaging.getToken()` or `deleteToken()` itself: with the flag on, they throw.
 
@@ -149,7 +149,7 @@ await SignalPlus.onBackgroundMessage(onBackground);
 ## Notification settings
 
 ```dart
-// Read: every category with its state, and the quiet hours
+// Read: every category with its name, description and state, in the dashboard's order
 final PreferencesEntity settings =
     (await SignalPlus.preferences()).getOrElse((_) => throw StateError('offline'));
 
@@ -165,7 +165,29 @@ await SignalPlus.setQuietHours(
 await SignalPlus.clearQuietHours();
 ```
 
-A locked category cannot be turned off; it comes back in `rejected`.
+One category by its key, for a switch in your settings screen:
+
+```dart
+// Read: on or off, and whether the user may change it
+final CategoryPreferenceEntity promotions =
+    (await SignalPlus.categoryPreference('Promotions')).getOrElse((_) => throw StateError('offline'));
+// Show the switch disabled when promotions.locked is true
+
+await SignalPlus.setCategoryEnabled('Promotions', enabled: false);
+await SignalPlus.toggleCategory('Promotions'); // answers the new state
+```
+
+A locked category cannot be turned off: `setCategoryEnabled` and `toggleCategory` answer `ServiceErrorCodes.categoryLocked`, and an unknown key `ServiceErrorCodes.categoryUnknown`.
+
+Every notification at once, for an "All notifications" switch:
+
+```dart
+await SignalPlus.muteAll();
+await SignalPlus.unmuteAll();
+final bool muted = (await SignalPlus.preferences()).map((PreferencesEntity p) => p.muted).getOrElse((_) => false);
+```
+
+While muted, only locked categories (security, account) and silent pushes still arrive. Each category keeps the user's own choice in `enabled`, so unmuting brings everything back as it was; show the category switches disabled while `muted` is true.
 
 ---
 
@@ -260,8 +282,11 @@ Everything else is set by the package: the app's name, the notification icon (yo
 | `onMessage(handler)`                              | `StreamSubscription`       | Notifications while the app is open.                                |
 | `onNotificationTap(handler)`                      | `StreamSubscription`       | Taps, including the launch tap.                                     |
 | `onBackgroundMessage(handler)`                    | `Unit`                     | Optional: your own code for notifications that arrive while closed. |
-| `preferences()`                                   | `PreferencesEntity`        | Categories and quiet hours.                                         |
+| `preferences()`                                   | `PreferencesEntity`        | Categories, quiet hours, and whether everything is muted.           |
 | `updatePreferences(choices)`                      | `UpdatedPreferencesEntity` | Turn categories on or off.                                          |
+| `categoryPreference(key)` | `CategoryPreferenceEntity` | One category: on or off, and locked. |
+| `setCategoryEnabled(key, enabled:)` / `toggleCategory(key)` | `CategoryPreferenceEntity` | Turn one category on or off. |
+| `muteAll()` / `unmuteAll()` | `PreferencesEntity` | Turn every notification off, or back on as it was. |
 | `setQuietHours(quietHours)` / `clearQuietHours()` | `PreferencesEntity`        | Quiet hours.                                                        |
 | `topics()`                                        | `List<String>`             | Topics available to follow.                                         |
 | `recipientTopics()`                               | `List<String>`             | Topics the user follows.                                            |

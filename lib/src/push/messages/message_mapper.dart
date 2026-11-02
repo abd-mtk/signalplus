@@ -17,14 +17,16 @@ abstract final class MessageMapper {
     final Option<RemoteNotification> block = message.notificationBlock;
     return NotificationContent(
       id: notificationId(message),
-      title: (message.isDataOnly
-              ? message.dataTitle
-              : block.flatMap((final RemoteNotification value) => Option.fromNullable(value.title)))
-          .getOrElse(() => appName),
-      body: (message.isDataOnly
-              ? message.dataBody
-              : block.flatMap((final RemoteNotification value) => Option.fromNullable(value.body)))
-          .getOrElse(() => ''),
+      title:
+          (message.isDataOnly
+                  ? message.dataTitle
+                  : block.flatMap((final RemoteNotification value) => Option.fromNullable(value.title)))
+              .getOrElse(() => appName),
+      body:
+          (message.isDataOnly
+                  ? message.dataBody
+                  : block.flatMap((final RemoteNotification value) => Option.fromNullable(value.body)))
+              .getOrElse(() => ''),
       data: message.data,
       imageUrl: message.imageUrl,
       channelId: message.androidChannelId
@@ -34,22 +36,27 @@ abstract final class MessageMapper {
   }
 
   static NotificationPayload remote(final RemoteMessage message, {required final String appName}) {
-    final Option<RemoteNotification> block = message.notificationBlock;
-    return NotificationPayload.fromMap(
-      message.data,
-      defaultTitle: block
-          .flatMap((final RemoteNotification value) => Option.fromNullable(value.title))
-          .getOrElse(() => appName),
-      defaultBody: block
-          .flatMap((final RemoteNotification value) => Option.fromNullable(value.body))
-          .getOrElse(() => ''),
-    );
+    final NotificationContent shown = content(message, appName: appName);
+    return NotificationPayload(title: shown.title, body: shown.body, data: message.data);
   }
+
+  static String encodeLocal(final NotificationContent content) => jsonEncode(<String, dynamic>{
+    LocalKeys.title: content.title,
+    LocalKeys.body: content.body,
+    LocalKeys.data: content.data,
+  });
 
   static NotificationPayload local(final Option<String> raw, {required final String defaultTitle}) =>
       decodeObject(raw).match(
         () => NotificationPayload(title: defaultTitle, body: '', data: const <String, dynamic>{}, rawPayload: raw),
-        (final Map<String, dynamic> data) => NotificationPayload.fromMap(data, defaultTitle: defaultTitle),
+        (final Map<String, dynamic> map) => switch (map[LocalKeys.data]) {
+          final Map<String, dynamic> data => NotificationPayload(
+            title: map.nonEmptyTextAt(LocalKeys.title).getOrElse(() => defaultTitle),
+            body: map.textAt(LocalKeys.body).getOrElse(() => ''),
+            data: data,
+          ),
+          _ => NotificationPayload.fromMap(map, defaultTitle: defaultTitle),
+        },
       );
 
   static int notificationId(final RemoteMessage message) =>

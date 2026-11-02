@@ -1,6 +1,5 @@
 import 'dart:io';
 
-/// Brings `android/app/build.gradle(.kts)` up to what the package needs, touching only what is missing.
 final class AndroidSetup {
   const AndroidSetup({required this.appRoot});
 
@@ -68,10 +67,9 @@ final class GradleEdit {
     if (!RegExp('coreLibraryDesugaring\\s*[("\']').hasMatch(source)) {
       final String dependency = kotlin ? 'coreLibraryDesugaring("$desugar")' : "coreLibraryDesugaring '$desugar'";
       final Match? block = RegExp(r'^dependencies\s*\{[ \t]*$', multiLine: true).firstMatch(source);
-      source =
-          block != null
-              ? source.replaceRange(block.end, block.end, '\n    $dependency')
-              : '${source.trimRight()}\n\ndependencies {\n    $dependency\n}\n';
+      source = block != null
+          ? source.replaceRange(block.end, block.end, '\n    $dependency')
+          : '${source.trimRight()}\n\ndependencies {\n    $dependency\n}\n';
       notes.add('Desugaring library: added $desugar.');
     }
 

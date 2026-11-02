@@ -21,7 +21,9 @@ final class NotificationDetailsFactory {
     final Option<String> attachmentPath = const None(),
     final Option<ChannelSpec> channel = const None(),
   }) {
-    final Option<ByteArrayAndroidBitmap> bitmap = image.map((final NotificationImage value) => value.androidBitmap);
+    final Option<ByteArrayAndroidBitmap> bitmap = image.map(
+      (final NotificationImage value) => ByteArrayAndroidBitmap(value.bytes),
+    );
     final ChannelSpec target = channel.getOrElse(() => defaultChannel);
     return NotificationDetails(
       android: AndroidNotificationDetails(
@@ -58,9 +60,9 @@ final class NotificationDetailsFactory {
 
   NotificationDetails summary(final int count) => NotificationDetails(
     android: AndroidNotificationDetails(
-      PushSettings.channelId,
-      config.channelName,
-      channelDescription: config.channelDescription,
+      defaultChannel.id,
+      defaultChannel.name,
+      channelDescription: defaultChannel.description,
       importance: Importance.max,
       priority: Priority.max,
       groupKey: groupKey,

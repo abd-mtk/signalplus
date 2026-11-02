@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:signalplus/src/setup/android_setup.dart';
 import 'package:signalplus/src/setup/ios_setup.dart';
 
-/// `dart run signalplus:setup`, from the root of the app: everything the package needs that code cannot do at run time.
 Future<void> main() async {
   final Directory app = Directory.current;
   if (!File('${app.path}/pubspec.yaml').existsSync()) {

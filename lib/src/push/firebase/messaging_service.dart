@@ -7,7 +7,6 @@ import '../../core/utils/logger.dart';
 import '../messages/message_mapper.dart';
 import '../models/push_events.dart';
 import '../models/push_settings.dart';
-import '../notification/initial_notification.dart';
 import '../notification/local_notification_service.dart';
 
 final class MessagingService {
@@ -16,7 +15,6 @@ final class MessagingService {
     required this.config,
     required this.events,
     required this.notifications,
-    required this.initialNotification,
     required final KitLogger logger,
     final Option<Stream<RemoteMessage>> onMessage = const None(),
     final Option<Stream<RemoteMessage>> onMessageOpenedApp = const None(),
@@ -36,16 +34,16 @@ final class MessagingService {
 
   final LocalNotificationService notifications;
 
-  final InitialNotificationStore initialNotification;
-
   final KitLogger log;
 
   final List<StreamSubscription<RemoteMessage>> subscriptions = <StreamSubscription<RemoteMessage>>[];
 
   Future<void> setupListeners() async {
-    Option.fromNullable(await messaging.getInitialMessage())
-        .map((final RemoteMessage message) => MessageMapper.remote(message, appName: config.appName))
-        .match(() {}, initialNotification.set);
+    try {
+      Option.fromNullable(await messaging.getInitialMessage()).match(() {}, onOpenedApp);
+    } on Object catch (error, stackTrace) {
+      log.error('Failed to read the launch message', error, stackTrace);
+    }
     subscriptions.addAll(<StreamSubscription<RemoteMessage>>[
       onMessage.listen(onForegroundMessage),
       onMessageOpenedApp.listen(onOpenedApp),

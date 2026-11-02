@@ -79,18 +79,8 @@ void main() {
       expect(payload.body, 'Body only');
     });
 
-    test('a nested notification map is read', () {
-      final NotificationPayload payload = NotificationPayload.fromMap(<String, dynamic>{
-        'notification': <String, String>{'title': 'Nested', 'body': 'Nested body'},
-      });
-
-      expect(payload.title, 'Nested');
-      expect(payload.body, 'Nested body');
-    });
-
-    test('non string titles and non map notifications are ignored', () {
+    test('a non string title is ignored', () {
       expect(NotificationPayload.fromMap(<String, dynamic>{'title': 42}, defaultTitle: 'F').title, 'F');
-      expect(NotificationPayload.fromMap(<String, dynamic>{'notification': 'oops'}, defaultTitle: 'F').body, '');
     });
 
     test('an empty body falls back to the default body', () {

@@ -7,8 +7,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/push/messages/message_mapper.dart';
+import 'package:signalplus/src/push/models/push_events.dart';
 import 'package:signalplus/src/push/models/push_settings.dart';
-import 'package:signalplus/src/push/notification/initial_notification.dart';
 import 'package:signalplus/src/push/notification/local_notification_service.dart';
 import 'package:signalplus/src/push/notification/notification_channel.dart';
 import 'package:signalplus/src/push/notification/notification_image.dart';
@@ -21,7 +21,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late FakeLocalNotificationsPlugin plugin;
-  late InitialNotificationStore initial;
   late List<NotificationPayload> taps;
   late List<String> requestedImages;
 
@@ -29,10 +28,10 @@ void main() {
     final PushSettings config = testConfig,
     final Option<NotificationImage> image = const None(),
     final Option<Directory> attachmentDirectory = const None(),
+    final Option<PushEvents> events = const None(),
   }) => LocalNotificationService(
     config: config,
-    events: eventsWith(onTap: taps.add),
-    initialNotification: initial,
+    events: events.getOrElse(() => eventsWith(onTap: taps.add)),
     logger: silentLogger,
     plugin: Some(plugin),
     loadImage: (final String url) async {
@@ -44,7 +43,6 @@ void main() {
 
   setUp(() {
     plugin = FakeLocalNotificationsPlugin();
-    initial = InitialNotificationStore();
     taps = <NotificationPayload>[];
     requestedImages = <String>[];
   });
@@ -52,7 +50,7 @@ void main() {
   tearDown(() => debugDefaultTargetPlatformOverride = null);
 
   group('show', () {
-    test('shows text with the data as JSON payload', () async {
+    test('shows text with the title, body and data in the payload', () async {
       await service().show(
         const NotificationContent(id: 7, title: 'T', body: 'B', data: <String, dynamic>{'route': '/orders'}),
       );
@@ -60,7 +58,11 @@ void main() {
       final ShownNotification shown = plugin.shown.single;
       expect(shown.id, 7);
       expect(shown.title, 'T');
-      expect(jsonDecode(shown.payload!), <String, dynamic>{'route': '/orders'});
+      expect(jsonDecode(shown.payload!), <String, dynamic>{
+        LocalKeys.title: 'T',
+        LocalKeys.body: 'B',
+        LocalKeys.data: <String, dynamic>{'route': '/orders'},
+      });
       expect(shown.details!.android!.styleInformation, isA<BigTextStyleInformation>());
       expect(shown.details!.android!.channelId, PushSettings.channelId);
     });
@@ -190,7 +192,7 @@ void main() {
       expect(service().initialize(), throwsA(isA<PlatformException>()));
     });
 
-    test('keeps the launch notification instead of tapping it', () async {
+    test('keeps the launch notification until the app listens for taps', () async {
       plugin.launchDetails = const NotificationAppLaunchDetails(
         true,
         notificationResponse: NotificationResponse(
@@ -199,16 +201,19 @@ void main() {
         ),
       );
 
-      await service().initialize();
+      final PushEvents events = PushEvents();
+      await service(events: Some(events)).initialize();
 
       expect(taps, isEmpty);
-      expect(initial.take().map((final NotificationPayload payload) => payload.data['route']), const Some('/orders'));
+      expect(
+        events.takePendingTap().map((final NotificationPayload payload) => payload.data['route']),
+        const Some('/orders'),
+      );
     });
 
     test('in the background a category message uses the channel Android already keeps', () async {
-      plugin.android =
-          FakeAndroidNotifications()
-            ..channels.add(const AndroidNotificationChannel('orders', 'الطلبات', importance: Importance.high));
+      plugin.android = FakeAndroidNotifications()
+        ..channels.add(const AndroidNotificationChannel('orders', 'الطلبات', importance: Importance.high));
       final LocalNotificationService notifications = service();
 
       await notifications.initialize(background: true);
@@ -232,8 +237,8 @@ void main() {
     });
 
     test('only channels Android has are deleted, and they stop being used', () async {
-      final FakeAndroidNotifications android =
-          plugin.android = FakeAndroidNotifications()..channels.add(const AndroidNotificationChannel('general', 'عام'));
+      final FakeAndroidNotifications android = plugin.android = FakeAndroidNotifications()
+        ..channels.add(const AndroidNotificationChannel('general', 'عام'));
       final LocalNotificationService notifications = service();
       await notifications.initialize();
 
@@ -269,10 +274,11 @@ void main() {
           ),
         );
 
-      await service(config: config).initialize(background: true);
+      final PushEvents events = PushEvents();
+      await service(config: config, events: Some(events)).initialize(background: true);
 
       expect(plugin.cancelled, isEmpty);
-      expect(initial.take(), const None());
+      expect(events.takePendingTap(), const None());
     });
 
     test('taps while running reach the callback', () async {
@@ -286,6 +292,40 @@ void main() {
       );
 
       expect(taps.single.rawPayload, const Some('order:42'));
+    });
+
+    test('a tap on the group summary is not a notification tap', () async {
+      await service().initialize();
+
+      plugin.onTap!(
+        const NotificationResponse(
+          notificationResponseType: NotificationResponseType.selectedNotification,
+          id: summaryNotificationId,
+        ),
+      );
+
+      expect(taps, isEmpty);
+    });
+
+    test('a tap carries the title and body that were shown', () async {
+      final LocalNotificationService notifications = service();
+      await notifications.initialize();
+      await notifications.show(
+        const NotificationContent(id: 7, title: 'T', body: 'B', data: <String, dynamic>{'route': '/orders'}),
+      );
+
+      plugin.onTap!(
+        NotificationResponse(
+          notificationResponseType: NotificationResponseType.selectedNotification,
+          id: 7,
+          payload: plugin.shown.single.payload,
+        ),
+      );
+
+      expect(
+        taps.single,
+        const NotificationPayload(title: 'T', body: 'B', data: <String, dynamic>{'route': '/orders'}),
+      );
     });
   });
 

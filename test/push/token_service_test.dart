@@ -56,6 +56,23 @@ void main() {
     expect(tokens, <String>['token-1234567890', 'token-new-0000000']);
   });
 
+  test('requests at the same time share one registration', () async {
+    final List<String> results = await Future.wait(<Future<String>>[
+      service.getToken(),
+      service.refresh().then((final Option<String> value) => value.getOrElse(() => '')),
+    ]);
+
+    expect(results, <String>['token-1234567890', 'token-1234567890']);
+    expect(messaging.registerCalls, 1);
+  });
+
+  test('a later request registers again', () async {
+    await service.getToken();
+    await service.getToken();
+
+    expect(messaging.registerCalls, 2);
+  });
+
   test('refresh swallows failures and answers nothing', () async {
     messaging.registerError = Exception('offline');
 

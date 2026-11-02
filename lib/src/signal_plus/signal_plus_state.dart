@@ -9,6 +9,7 @@ import '../api/domain/entities/installation.dart';
 import '../api/signalplus_client.dart';
 import '../core/kits/data_kit.dart';
 import '../core/storage/key_value_store.dart';
+import '../core/utils/memo.dart';
 import '../device/device_snapshot.dart';
 import '../device/fresh_install.dart';
 import '../device/installation_id_store.dart';
@@ -31,7 +32,9 @@ abstract final class SignalPlusState {
 
   static Option<Future<Either<ServiceFailure, Unit>>> starting = const None();
 
-  static Option<Future<bool>> prepared = const None();
+  static int generation = 0;
+
+  static final Memo<bool> prepared = Memo<bool>();
 
   static Option<NotificationPayload> pendingLaunch = const None();
 
@@ -55,9 +58,12 @@ abstract final class SignalPlusState {
 
   static ExternalIdStore externalIds = ExternalIdStore(store: secure);
 
+  static CategoryChannelStore channelIds = CategoryChannelStore(store: local);
+
   static Future<Either<ServiceFailure, Unit>> init(final SignalPlusConfig config) {
     if (runtime.isSome()) return Future<Either<ServiceFailure, Unit>>.value(const Right(unit));
     return starting.getOrElse(() {
+      final int started = generation;
       final Future<Either<ServiceFailure, Unit>> run = RepositoryGuard.guard(config.log, () async {
         await prepare();
         final DeviceSnapshotReader device = createDevice(config);
@@ -66,8 +72,8 @@ abstract final class SignalPlusState {
           onError: (final Object _) => '',
         );
         final PushSettings settings = config.settings(appName: appName);
+        await BackgroundSettings.saveConfig(local, settings);
         final PushPort push = await startPush(config, settings);
-        await BackgroundSettings.saveConfig(secure, settings);
         final SignalPlusRuntime value = SignalPlusRuntime(
           config: config,
           settings: settings,
@@ -75,8 +81,13 @@ abstract final class SignalPlusState {
           client: createClient(config),
           installationIds: installationIds,
           externalIds: externalIds,
+          channelIds: channelIds,
           device: device,
         );
+        if (started != generation) {
+          await value.dispose();
+          return unit;
+        }
         attach(value);
         unawaited(value.syncChannels());
         if (config.registerOnStart) unawaited(value.registerDevice(locale: config.language));
@@ -92,7 +103,7 @@ abstract final class SignalPlusState {
         final Either<ServiceFailure, SdkInstallationEntity> result = await value.registerDevice(locale: locale);
         await value.refreshChannels(locale);
         await value.guard(() async {
-          await BackgroundSettings.saveConfig(secure, value.settings.localized(locale));
+          await BackgroundSettings.saveConfig(local, value.settings.localized(locale));
           return unit;
         }, Operations.storage);
         return result;
@@ -111,20 +122,13 @@ abstract final class SignalPlusState {
         backgroundHandler: const Some(signalPlusBackgroundEntry),
       );
 
-  static Future<bool> prepare() => prepared.getOrElse(() {
+  static Future<bool> prepare() => prepared(() {
     WidgetsFlutterBinding.ensureInitialized();
-    final Future<bool> check = FreshInstall.resetIfNew(
+    return FreshInstall.resetIfNew(
       secure: secure,
       local: local,
-      keys: const <String>[
-        InstallationIdStore.key,
-        ExternalIdStore.key,
-        BackgroundSettings.configKey,
-        BackgroundSettings.handlerKey,
-      ],
+      keys: const <String>[InstallationIdStore.key, ExternalIdStore.key],
     );
-    prepared = some(check);
-    return check;
   });
 
   static void attach(final SignalPlusRuntime value) {
@@ -161,11 +165,17 @@ abstract final class SignalPlusState {
     final Future<Either<ServiceFailure, T>> Function(SignalPlusRuntime value) run,
   ) => runtime.match(() async => Left<ServiceFailure, T>(notInitialized), run);
 
+  static Future<Either<ServiceFailure, T>> withPush<T>(
+    final Future<T> Function(PushPort push) run,
+    final String operation,
+  ) => SignalPlusState.withRuntime((final SignalPlusRuntime value) => value.guard(() => run(value.push), operation));
+
   static Future<Either<ServiceFailure, T>> withDevice<T>(
     final Future<Either<ServiceFailure, T>> Function(SignalPlusRuntime value, DeviceAuth auth) run,
   ) => withRuntime((final SignalPlusRuntime value) => value.personal((final DeviceAuth auth) => run(value, auth)));
 
   static Future<void> dispose() async {
+    generation++;
     await runtime.match(() async {}, (final SignalPlusRuntime value) => value.dispose());
     runtime = const None();
     starting = const None();
@@ -175,13 +185,16 @@ abstract final class SignalPlusState {
   @visibleForTesting
   static Future<void> reset({required final KeyValueStore secureStore, required final KeyValueStore localStore}) async {
     await dispose();
-    prepared = const None();
+    prepared.reset();
     secure = secureStore;
     local = localStore;
     installationIds = InstallationIdStore(store: secureStore);
     externalIds = ExternalIdStore(store: secureStore);
+    channelIds = CategoryChannelStore(store: localStore);
+    startPush = startFirebase;
     createClient = defaultClient;
     createDevice = defaultDevice;
+    launchScheduler = afterFirstFrame;
   }
 
   static const ServiceFailure notInitialized = ServiceFailure(

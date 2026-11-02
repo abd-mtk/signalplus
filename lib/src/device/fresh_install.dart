@@ -1,7 +1,5 @@
 import '../core/storage/key_value_store.dart';
 
-/// Secure storage survives a reinstall on iOS. A marker in plain storage, which
-/// does not, tells a new install apart so the old ids are not reused.
 abstract final class FreshInstall {
   static const String markerKey = 'signalplus.installed';
 

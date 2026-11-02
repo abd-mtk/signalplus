@@ -94,8 +94,9 @@ final class ApiHarness {
     requests.add(recorded);
     if (thrown case final Object error) throw error;
     final List<StubResponse> queued = sequences[recorded.route] ?? <StubResponse>[];
-    final StubResponse stub =
-        queued.isNotEmpty ? queued.removeAt(0) : routes[recorded.route] ?? const StubResponse(404);
+    final StubResponse stub = queued.isNotEmpty
+        ? queued.removeAt(0)
+        : routes[recorded.route] ?? const StubResponse(404);
     return http.Response.bytes(
       stub.body.match(() => <int>[], (final Object body) => utf8.encode(jsonEncode(body))),
       stub.status,

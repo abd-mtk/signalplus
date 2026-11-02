@@ -1,3 +1,19 @@
+## 0.5.0
+
+* `categoryPreference(key)`, `setCategoryEnabled(key, enabled:)` and `toggleCategory(key)`: one category of the signed-in user, read and switched by its key. A locked category answers `CategoryLocked` without a request.
+* `muteAll()` and `unmuteAll()`: every notification off for the signed-in user, and back on as it was. Locked categories and silent pushes still arrive. `PreferencesEntity.muted` and `UpdatedPreferencesEntity.muted` say whether it is on.
+* `CategoryPreferenceEntity.description`: the category's description in the user's language, for the settings screen. Categories come in the order set in the dashboard.
+* A category deleted from the dashboard loses its Android channel on the next start. Only channels the package created are removed, never the app's own.
+* Tapping a notification shown by the package gives the title and body that were shown. A tap on the group summary is no longer reported as a notification tap.
+* A storage or device read that fails answers `Left` instead of throwing, and is tried again on the next call instead of failing until the app restarts.
+* The background isolate reads its settings from plain app storage, so a locked iPhone no longer stops the background handler.
+* A failure reading the launch message no longer fails `init`.
+* Two token requests at the same time share one FCM registration.
+* The request timeout also covers reading the response body.
+* Requires Flutter 3.41 and Dart 3.11, the minimum the dependencies already needed.
+* **Breaking:** `DeliveryEventType` and `DevicePlatform` are no longer exported; no public call took or returned them.
+* **Breaking:** a category's Android channel is its key. `CategoryEntity.androidChannelId` is gone, and `AndroidChannelId` from the service is no longer read. Channels an earlier version created under another id, such as `orders` for the `Orders` category, are left behind once; the new channel starts with the default settings.
+
 ## 0.2.3
 
 * A category that means the same as the default channel (key or channel id `general`, or the default channel's name) shares it instead of adding a second "General" to the Android settings. A duplicate channel an earlier version created is deleted.

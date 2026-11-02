@@ -109,10 +109,9 @@ void main() {
     });
 
     test('writes the build file and asks for google-services.json when it is missing', () {
-      final File build =
-          File('${app.path}/android/app/build.gradle.kts')
-            ..createSync(recursive: true)
-            ..writeAsStringSync(kotlinTemplate);
+      final File build = File('${app.path}/android/app/build.gradle.kts')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(kotlinTemplate);
 
       final List<String> notes = AndroidSetup(appRoot: app).setUp();
 

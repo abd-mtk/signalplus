@@ -12,14 +12,11 @@ import '../messages/message_mapper.dart';
 import '../models/notification_payload.dart';
 import '../models/push_events.dart';
 import '../models/push_settings.dart';
-import '../notification/initial_notification.dart';
 import '../notification/local_notification_service.dart';
 import '../notification/notification_channel.dart';
 import '../notification/notification_permission.dart';
 import '../push_port.dart';
 
-/// Composition root of the push side: Firebase, local notifications, the FCM
-/// listeners, the token and the permission.
 final class SignalPlusInstance implements PushPort {
   const SignalPlusInstance({
     required this.events,
@@ -27,7 +24,6 @@ final class SignalPlusInstance implements PushPort {
     required this.permissions,
     required this.tokens,
     required this.messaging,
-    required this.initialNotification,
   });
 
   @override
@@ -40,8 +36,6 @@ final class SignalPlusInstance implements PushPort {
   final TokenService tokens;
 
   final MessagingService messaging;
-
-  final InitialNotificationStore initialNotification;
 
   static Future<SignalPlusInstance> start({
     required final PushSettings config,
@@ -61,11 +55,9 @@ final class SignalPlusInstance implements PushPort {
     );
 
     final PushEvents events = PushEvents();
-    final InitialNotificationStore initialNotification = InitialNotificationStore();
     final LocalNotificationService notifications = LocalNotificationService(
       config: config,
       events: events,
-      initialNotification: initialNotification,
       logger: logger,
     );
     await notifications.initialize();
@@ -75,7 +67,6 @@ final class SignalPlusInstance implements PushPort {
       config: config,
       events: events,
       notifications: notifications,
-      initialNotification: initialNotification,
       logger: logger,
     );
     await messaging.setupListeners();
@@ -97,11 +88,9 @@ final class SignalPlusInstance implements PushPort {
       permissions: permissions,
       tokens: tokens,
       messaging: messaging,
-      initialNotification: initialNotification,
     );
   }
 
-  /// Shows a data-only message from the background isolate.
   static Future<void> showBackgroundMessage(final RemoteMessage message, {required final PushSettings config}) async {
     if (!message.needsLocalDisplay(foreground: false)) return;
 
@@ -110,7 +99,6 @@ final class SignalPlusInstance implements PushPort {
       final LocalNotificationService notifications = LocalNotificationService(
         config: config,
         events: PushEvents(),
-        initialNotification: InitialNotificationStore(),
         logger: logger,
       );
       await notifications.initialize(background: true);
@@ -142,7 +130,7 @@ final class SignalPlusInstance implements PushPort {
   Future<void> clearNotifications() => notifications.clearDisplayed();
 
   @override
-  Option<NotificationPayload> takeInitialNotification() => initialNotification.take().alt(events.takePendingTap);
+  Option<NotificationPayload> takeInitialNotification() => events.takePendingTap();
 
   @override
   Future<void> dispose() async {
