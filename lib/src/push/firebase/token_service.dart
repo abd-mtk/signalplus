@@ -36,20 +36,27 @@ final class TokenService {
 
   Option<StreamSubscription<String>> refreshSubscription = const None();
 
+  Option<Future<String>> pendingToken = const None();
+
   void listenForRefresh() {
     refreshSubscription = refreshSubscription.alt(
       () => some(
         messaging.onRegistered.listen(
           publish,
-          onError:
-              (final Object error, final StackTrace stackTrace) =>
-                  log.error('Registration stream failed', error, stackTrace),
+          onError: (final Object error, final StackTrace stackTrace) =>
+              log.error('Registration stream failed', error, stackTrace),
         ),
       ),
     );
   }
 
-  Future<String> getToken() async {
+  Future<String> getToken() => pendingToken.getOrElse(() {
+    final Future<String> request = register().whenComplete(() => pendingToken = const None());
+    pendingToken = some(request);
+    return request;
+  });
+
+  Future<String> register() async {
     if (!await apnsReady()) throw const PushException(apnsNotReady);
     final Future<String> registered = messaging.onRegistered.first.timeout(
       registerTimeout,
@@ -91,7 +98,7 @@ final class TokenService {
   Future<bool> apnsReady() async {
     if (!defaultTargetPlatform.isApple) return true;
     for (int attempt = 1; attempt <= apnsAttempts; attempt++) {
-      if (await messaging.hasApnsToken) return true;
+      if (await messaging.getAPNSToken() != null) return true;
       if (attempt < apnsAttempts) await Future<void>.delayed(apnsRetryDelay);
     }
     return false;

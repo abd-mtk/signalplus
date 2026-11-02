@@ -29,11 +29,10 @@ void main() {
   });
 
   test('a config saved by 0.1.0 is still read, in Arabic', () async {
-    final MemoryStore store =
-        MemoryStore()
-          ..values[BackgroundSettings.configKey] =
-              '{"AppName":"App","ChannelName":"C","ChannelDescription":"D","Icon":"@mipmap/ic_launcher",'
-              '"Logs":true,"Group":false,"Images":true}';
+    final MemoryStore store = MemoryStore()
+      ..values[BackgroundSettings.configKey] =
+          '{"AppName":"App","ChannelName":"C","ChannelDescription":"D","Icon":"@mipmap/ic_launcher",'
+          '"Logs":true,"Group":false,"Images":true}';
 
     final PushSettings config = (await BackgroundSettings.readConfig(
       store,

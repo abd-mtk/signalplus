@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -11,7 +10,6 @@ import '../messages/message_mapper.dart';
 import '../models/notification_payload.dart';
 import '../models/push_events.dart';
 import '../models/push_settings.dart';
-import 'initial_notification.dart';
 import 'notification_channel.dart';
 import 'notification_details_factory.dart';
 import 'notification_image.dart';
@@ -20,7 +18,6 @@ final class LocalNotificationService {
   LocalNotificationService({
     required this.config,
     required this.events,
-    required this.initialNotification,
     required final KitLogger logger,
     final Option<FlutterLocalNotificationsPlugin> plugin = const None(),
     final NotificationImageLoader loadImage = NotificationImages.download,
@@ -36,8 +33,6 @@ final class LocalNotificationService {
 
   final PushEvents events;
 
-  final InitialNotificationStore initialNotification;
-
   final NotificationImageLoader loadImage;
 
   final Option<Directory> attachmentDirectory;
@@ -50,7 +45,6 @@ final class LocalNotificationService {
 
   static const MethodChannel native = MethodChannel('signalplus');
 
-  /// The app's own notification icon when it ships one, otherwise its launcher icon.
   static const List<String> icons = <String>['@drawable/ic_notification', '@mipmap/ic_launcher'];
 
   Future<void> initialize({final bool background = false}) async {
@@ -67,8 +61,7 @@ final class LocalNotificationService {
     launch
         .filter((final NotificationAppLaunchDetails value) => value.didNotificationLaunchApp)
         .flatMap((final NotificationAppLaunchDetails value) => Option.fromNullable(value.notificationResponse))
-        .map((final NotificationResponse response) => payloadOf(response))
-        .match(() {}, initialNotification.set);
+        .match(() {}, onTap);
     log.info('Initialized');
   }
 
@@ -101,7 +94,6 @@ final class LocalNotificationService {
     }
   }
 
-  /// Deletes the channels among [ids] that Android has, so no channel is deleted that never existed.
   Future<void> deleteChannels(final List<String> ids) async {
     final List<String> existing = ids.where(categoryChannels.containsKey).toList();
     await AndroidChannels.delete(plugin, existing);
@@ -120,13 +112,12 @@ final class LocalNotificationService {
       () async => const None(),
       (final String url) => loadImage(url),
     );
-    final Option<String> attachmentPath =
-        defaultTargetPlatform.isIOS
-            ? await image.match(
-              () async => const None(),
-              (final NotificationImage value) => attachmentFor(content.id, value),
-            )
-            : const None();
+    final Option<String> attachmentPath = defaultTargetPlatform.isIOS
+        ? await image.match(
+            () async => const None(),
+            (final NotificationImage value) => attachmentFor(content.id, value),
+          )
+        : const None();
 
     await plugin.show(
       id: content.id,
@@ -139,7 +130,7 @@ final class LocalNotificationService {
         attachmentPath: attachmentPath,
         channel: content.channelId.flatMap((final String id) => Option.fromNullable(categoryChannels[id])),
       ),
-      payload: jsonEncode(content.data),
+      payload: MessageMapper.encodeLocal(content),
     );
     if (config.options.groupNotifications) await updateGroupSummary();
   }
@@ -169,7 +160,6 @@ final class LocalNotificationService {
       title: config.appName,
       body: config.groupSummary(count),
       notificationDetails: details.summary(count),
-      payload: jsonEncode(<String, bool>{'isSummary': true}),
     );
   }
 
@@ -185,5 +175,8 @@ final class LocalNotificationService {
   NotificationPayload payloadOf(final NotificationResponse response) =>
       MessageMapper.local(Option.fromNullable(response.payload), defaultTitle: config.appName);
 
-  void onTap(final NotificationResponse response) => events.tap(payloadOf(response));
+  void onTap(final NotificationResponse response) {
+    if (response.id == summaryNotificationId) return;
+    events.tap(payloadOf(response));
+  }
 }

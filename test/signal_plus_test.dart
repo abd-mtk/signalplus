@@ -54,6 +54,7 @@ void main() {
       client: harness.client,
       installationIds: idStore(),
       externalIds: ExternalIdStore(store: secure),
+      channelIds: CategoryChannelStore(store: local),
       device: const FixedDevice(),
     ),
   );
@@ -108,8 +109,8 @@ void main() {
       expect(results.every((final Either<ServiceFailure, Unit> result) => result.isRight()), isTrue);
       expect(starts, 1);
       expect(SignalPlus.isInitialized, isTrue);
-      expect(secure.values[BackgroundSettings.configKey], contains('"AppName":"Shop"'));
-      expect(secure.values[BackgroundSettings.configKey], contains('"Locale":"ar"'));
+      expect(local.values[BackgroundSettings.configKey], contains('"AppName":"Shop"'));
+      expect(local.values[BackgroundSettings.configKey], contains('"Locale":"ar"'));
       expect(routes().where((final String route) => route != categoriesRoute), isEmpty);
     });
 
@@ -120,24 +121,16 @@ void main() {
       await pumpEventQueue();
 
       expect(routes(), <String>[categoriesRoute]);
-      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
+      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['Orders', 'Promotions']);
     });
 
     test('a General category shares the default channel instead of adding a second one', () async {
       harness.on(
         categoriesRoute,
         StubResponse.data(<Map<String, dynamic>>[
-          <String, dynamic>{
-            'Key': 'General',
-            'AndroidChannelId': 'general',
-            'Name': 'عام',
-            'Lane': 'Bulk',
-            'Locked': false,
-            'DefaultEnabled': true,
-          },
+          <String, dynamic>{'Key': 'General', 'Name': 'عام', 'Lane': 'Bulk', 'Locked': false, 'DefaultEnabled': true},
           <String, dynamic>{
             'Key': 'News',
-            'AndroidChannelId': 'news',
             'Name': 'الإشعارات العامة',
             'Lane': 'Bulk',
             'Locked': false,
@@ -145,7 +138,6 @@ void main() {
           },
           <String, dynamic>{
             'Key': 'Orders',
-            'AndroidChannelId': 'orders',
             'Name': 'الطلبات',
             'Lane': 'Critical',
             'Locked': false,
@@ -157,12 +149,46 @@ void main() {
       await SignalPlus.init(config);
       await pumpEventQueue();
 
-      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['orders']);
-      expect(push.deletedChannels, <String>['general', 'news']);
+      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['Orders']);
+      expect(push.deletedChannels, <String>['General', 'News']);
       expect(
         (await SignalPlus.categories(createChannels: false)).map((final List<CategoryEntity> items) => items.length),
         const Right<ServiceFailure, int>(3),
       );
+    });
+
+    test('a category removed from the dashboard loses its channel, and no channel of the app is touched', () async {
+      harness.on(categoriesRoute, StubResponse.data(fixture('categories')));
+      local.values[CategoryChannelStore.key] = 'Orders,Promotions,Offers';
+
+      await SignalPlus.init(config);
+      await pumpEventQueue();
+
+      expect(push.deletedChannels, <String>['Offers']);
+      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['Orders', 'Promotions']);
+      expect(local.values[CategoryChannelStore.key], 'Orders,Promotions');
+    });
+
+    test('with every category gone, every channel the package made goes too', () async {
+      harness.on(categoriesRoute, StubResponse.data(<Map<String, dynamic>>[]));
+      local.values[CategoryChannelStore.key] = 'Orders,Promotions';
+
+      await SignalPlus.init(config);
+      await pumpEventQueue();
+
+      expect(push.deletedChannels, <String>['Orders', 'Promotions']);
+      expect(local.values[CategoryChannelStore.key], '');
+    });
+
+    test('a failed category fetch deletes nothing and keeps the list', () async {
+      harness.on(categoriesRoute, StubResponse.failure(500, <String>['InternalError']));
+      local.values[CategoryChannelStore.key] = 'Orders,Promotions';
+
+      await SignalPlus.init(config);
+      await pumpEventQueue();
+
+      expect(push.deletedChannels, isEmpty);
+      expect(local.values[CategoryChannelStore.key], 'Orders,Promotions');
     });
 
     test('on iOS init fetches no categories, since there are no channels', () async {
@@ -198,8 +224,8 @@ void main() {
     });
 
     test('a failed start answers Left and can be tried again', () async {
-      SignalPlusState.startPush =
-          (final SignalPlusConfig _, final PushSettings _) async => throw StateError('no firebase');
+      SignalPlusState.startPush = (final SignalPlusConfig _, final PushSettings _) async =>
+          throw StateError('no firebase');
 
       final ServiceFailure failure = leftOf(await SignalPlus.init(config));
       expect(failure.operation, Operations.init);
@@ -322,6 +348,18 @@ void main() {
       expect(rightOf(await SignalPlus.externalId()), const Some('driver:42'));
     });
 
+    test('a storage failure answers Left instead of throwing, and the next call still runs', () async {
+      registered();
+      harness.on('POST /sdk/v1/installations/install-1/login', StubResponse.data(view('install-1', externalId: 'u')));
+      start();
+      secure.failWrites = true;
+
+      expect(leftOf(await SignalPlus.login('u')).operation, Operations.storage);
+
+      secure.failWrites = false;
+      expect((await SignalPlus.login('u')).isRight(), isTrue);
+    });
+
     test('logout forgets the external id', () async {
       registered();
       secure.values[ExternalIdStore.key] = 'u';
@@ -379,6 +417,95 @@ void main() {
         'PUT /sdk/v1/installations/install-1/recipient/topics/city',
       ]);
       expect(noSecretSent(), isTrue);
+    });
+
+    test('mute everything and back, and a device without a user is refused', () async {
+      registered();
+      harness.on(
+        'PUT /sdk/v1/installations/install-1/recipient/mute',
+        StubResponse.data(<String, dynamic>{'Muted': true, 'Categories': <dynamic>[], 'QuietHours': null}),
+      );
+      harness.onSequence('DELETE /sdk/v1/installations/install-1/recipient/mute', <StubResponse>[
+        StubResponse.data(<String, dynamic>{'Muted': false, 'Categories': <dynamic>[], 'QuietHours': null}),
+        StubResponse.failure(403, <String>['NotSignedIn']),
+      ]);
+      start();
+
+      expect(rightOf(await SignalPlus.muteAll()).muted, isTrue);
+      expect(rightOf(await SignalPlus.unmuteAll()).muted, isFalse);
+      expect(leftOf(await SignalPlus.unmuteAll()).hasCode(ServiceErrorCodes.notSignedIn), isTrue);
+    });
+
+    group('one category by its key', () {
+      const String route = 'PUT /sdk/v1/installations/install-1/recipient/preferences';
+
+      Map<String, dynamic> updated({required final bool promotions, final List<Object> rejected = const <Object>[]}) =>
+          <String, dynamic>{
+            'Categories': <Object>[
+              <String, dynamic>{'Key': 'Orders', 'Name': 'الطلبات', 'Enabled': true, 'Locked': true},
+              <String, dynamic>{'Key': 'Promotions', 'Name': 'العروض', 'Enabled': promotions, 'Locked': false},
+            ],
+            'QuietHours': null,
+            'Rejected': rejected,
+          };
+
+      setUp(() {
+        registered();
+        harness.on(
+          'GET /sdk/v1/installations/install-1/recipient/preferences',
+          StubResponse.data(fixture('preferences')),
+        );
+        start();
+      });
+
+      test('its state is read with whether it is locked', () async {
+        final CategoryPreferenceEntity orders = rightOf(await SignalPlus.categoryPreference('Orders'));
+
+        expect(orders.enabled, isTrue);
+        expect(orders.locked, isTrue);
+        expect(leftOf(await SignalPlus.categoryPreference('Nope')).hasCode(ServiceErrorCodes.categoryUnknown), isTrue);
+      });
+
+      test('it is switched with one choice and answers its new state', () async {
+        harness.on(route, StubResponse.data(updated(promotions: true)));
+
+        final CategoryPreferenceEntity promotions = rightOf(
+          await SignalPlus.setCategoryEnabled('Promotions', enabled: true),
+        );
+
+        expect(promotions.enabled, isTrue);
+        expect(harness.last.body, '{"Categories":[{"Key":"Promotions","Enabled":true}]}');
+      });
+
+      test('a rejection from the service comes back with its code', () async {
+        harness.on(
+          route,
+          StubResponse.data(
+            updated(
+              promotions: false,
+              rejected: <Object>[
+                <String, dynamic>{'Key': 'Orders', 'Error': 'CategoryLocked'},
+              ],
+            ),
+          ),
+        );
+
+        final ServiceFailure failure = leftOf(await SignalPlus.setCategoryEnabled('Orders', enabled: false));
+
+        expect(failure.hasCode(ServiceErrorCodes.categoryLocked), isTrue);
+      });
+
+      test('toggle reads, then sends the opposite', () async {
+        harness.on(route, StubResponse.data(updated(promotions: true)));
+
+        expect(rightOf(await SignalPlus.toggleCategory('Promotions')).enabled, isTrue);
+        expect(harness.last.body, '{"Categories":[{"Key":"Promotions","Enabled":true}]}');
+      });
+
+      test('toggle on a locked category sends nothing', () async {
+        expect(leftOf(await SignalPlus.toggleCategory('Orders')).hasCode(ServiceErrorCodes.categoryLocked), isTrue);
+        expect(routes().where((final String item) => item == route), isEmpty);
+      });
     });
 
     test('a device the service does not know yet is registered and the call tried once more', () async {
@@ -514,9 +641,9 @@ void main() {
 
         expect(push.channels.first.id, PushSettings.channelId);
         expect(push.channels.first.name, 'General Notifications');
-        expect(push.channels.skip(1).map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
+        expect(push.channels.skip(1).map((final ChannelSpec channel) => channel.id), <String>['Orders', 'Promotions']);
         expect(harness.last.headers['Accept-Language'], 'en');
-        expect(secure.values[BackgroundSettings.configKey], contains('"Locale":"en"'));
+        expect(local.values[BackgroundSettings.configKey], contains('"Locale":"en"'));
       },
     );
   });
@@ -565,7 +692,7 @@ void main() {
       final List<CategoryEntity> categories = rightOf(await SignalPlus.categories());
 
       expect(categories, hasLength(2));
-      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['orders', 'Promotions']);
+      expect(push.channels.map((final ChannelSpec channel) => channel.id), <String>['Orders', 'Promotions']);
       expect(push.channels.first.name, 'الطلبات');
       expect(push.channels.last.description, '');
       expect(routes(), <String>['GET /sdk/v1/categories']);

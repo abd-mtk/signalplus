@@ -5,8 +5,6 @@ import 'models/notification_payload.dart';
 import 'models/push_events.dart';
 import 'notification/notification_channel.dart';
 
-/// What the facade needs from the push side. [SignalPlusInstance] is the
-/// production implementation; tests use a fake.
 abstract class PushPort {
   PushEvents get events;
 
@@ -24,7 +22,6 @@ abstract class PushPort {
 
   Future<void> clearNotifications();
 
-  /// The tap that launched the app, or one that arrived before a listener existed.
   Option<NotificationPayload> takeInitialNotification();
 
   Future<void> dispose();

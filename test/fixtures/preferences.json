@@ -1,7 +1,8 @@
 {
+  "Muted": false,
   "Categories": [
-    {"Key": "Orders", "Name": "الطلبات", "Enabled": true, "Locked": true},
-    {"Key": "Promotions", "Name": "العروض", "Enabled": false, "Locked": false}
+    {"Key": "Orders", "Name": "الطلبات", "Description": "تحديثات الطلب", "Enabled": true, "Locked": true},
+    {"Key": "Promotions", "Name": "العروض", "Description": null, "Enabled": false, "Locked": false}
   ],
   "QuietHours": {"Start": "22:00", "End": "07:00", "Days": ["Fri", "Sat"]}
 }

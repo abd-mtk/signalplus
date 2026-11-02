@@ -5,7 +5,6 @@ import '../../core/utils/json_reader.dart';
 import '../../core/utils/logger.dart';
 import 'push_config.dart';
 
-/// [PushConfig] plus what the package works out by itself: the app's name and language.
 final class PushSettings {
   const PushSettings({
     required this.appName,

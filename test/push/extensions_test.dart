@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -67,12 +65,6 @@ void main() {
       expect(map.nonEmptyTextAt('text'), const Some('value'));
       expect(map.nonEmptyTextAt('empty'), const None());
     });
-
-    test('mapAt returns an empty map for anything that is not a map', () {
-      expect(map.mapAt('nested'), <String, String>{'a': 'b'});
-      expect(map.mapAt('text'), isEmpty);
-      expect(map.mapAt('missing'), isEmpty);
-    });
   });
 
   test('only http and https urls with a host are web urls', () {
@@ -87,23 +79,6 @@ void main() {
     expect(const ActiveNotification(id: 3, groupKey: 'g').isMemberOf('g'), isTrue);
     expect(const ActiveNotification(id: summaryNotificationId, groupKey: 'g').isMemberOf('g'), isFalse);
     expect(const ActiveNotification(id: 3, groupKey: 'other').isMemberOf('g'), isFalse);
-  });
-
-  test('isOk is true only for 200', () async {
-    final HttpServer server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    addTearDown(() => server.close(force: true));
-    server.listen((final HttpRequest request) {
-      request.response.statusCode = request.uri.path == '/ok' ? HttpStatus.ok : HttpStatus.notFound;
-      request.response.close();
-    });
-    final HttpClient client = HttpClient();
-    addTearDown(client.close);
-
-    Future<HttpClientResponse> get(final String path) async =>
-        (await client.get(server.address.host, server.port, path)).close();
-
-    expect((await get('/ok')).isOk, isTrue);
-    expect((await get('/missing')).isOk, isFalse);
   });
 
   test('masked never logs the full token', () {

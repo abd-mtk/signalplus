@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/api/client/api_config.dart';
+import 'package:signalplus/src/api/domain/entities/enums.dart';
 import 'package:signalplus/src/api/domain/entities/installation.dart';
+import 'package:signalplus/src/api/signalplus_client.dart';
 
 import '../support/api_harness.dart';
 
@@ -85,6 +88,21 @@ void main() {
     )..thrown = TimeoutException('slow');
 
     expect(leftOf(await harness.client.catalog.listCategories()).type, FailureType.timeout);
+  });
+
+  test('a body that stalls after the headers arrive also becomes a timeout failure', () async {
+    final StreamController<List<int>> body = StreamController<List<int>>();
+    addTearDown(body.close);
+    final SignalPlusClient client = SignalPlusClient.create(
+      const ApiConfig(appId: 'a', locale: ServiceLocale.ar, timeout: Duration(milliseconds: 10)),
+      client: Some(
+        MockClient.streaming(
+          (final http.BaseRequest request, final http.ByteStream _) async => http.StreamedResponse(body.stream, 200),
+        ),
+      ),
+    );
+
+    expect(leftOf(await client.catalog.listCategories()).type, FailureType.timeout);
   });
 
   test('a success body that does not match the schema becomes a decoding failure', () async {

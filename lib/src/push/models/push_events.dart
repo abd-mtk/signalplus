@@ -6,8 +6,6 @@ import 'package:fpdart/fpdart.dart';
 import '../../api/domain/entities/enums.dart';
 import 'notification_payload.dart';
 
-/// Broadcast streams for everything the push side produces. A tap that arrives
-/// before anyone listens is kept as [pendingTap] so it is not lost.
 final class PushEvents {
   final StreamController<String> tokenController = StreamController<String>.broadcast(sync: true);
 

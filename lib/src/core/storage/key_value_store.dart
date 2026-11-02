@@ -9,9 +9,6 @@ abstract class KeyValueStore {
   Future<void> write(final String key, final String value);
 }
 
-/// Encrypted storage: Keystore on Android, Keychain on iOS. The Keychain
-/// outlives the app, which is why [PreferencesKeyValueStore] carries the
-/// fresh-install marker.
 final class SecureKeyValueStore implements KeyValueStore {
   const SecureKeyValueStore([this.storage = const FlutterSecureStorage()]);
 
@@ -24,13 +21,15 @@ final class SecureKeyValueStore implements KeyValueStore {
   Future<void> write(final String key, final String value) => storage.write(key: key, value: value);
 }
 
-/// Plain storage that is removed with the app.
 final class PreferencesKeyValueStore implements KeyValueStore {
   const PreferencesKeyValueStore();
 
   @override
-  Future<Option<String>> read(final String key) async =>
-      Option.fromNullable((await SharedPreferences.getInstance()).getString(key));
+  Future<Option<String>> read(final String key) async {
+    final SharedPreferences preferences = await SharedPreferences.getInstance();
+    await preferences.reload();
+    return Option.fromNullable(preferences.getString(key));
+  }
 
   @override
   Future<void> write(final String key, final String value) async {

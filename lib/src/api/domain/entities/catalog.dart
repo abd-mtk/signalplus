@@ -8,13 +8,10 @@ final class CategoryEntity extends Equatable {
     required this.lane,
     required this.locked,
     required this.defaultEnabled,
-    this.androidChannelId = const None(),
     this.description = const None(),
   });
 
   final String key;
-
-  final Option<String> androidChannelId;
 
   final String name;
 
@@ -26,8 +23,8 @@ final class CategoryEntity extends Equatable {
 
   final bool defaultEnabled;
 
-  String get channelId => androidChannelId.getOrElse(() => key);
+  String get channelId => key;
 
   @override
-  List<Object> get props => <Object>[key, androidChannelId, name, description, lane, locked, defaultEnabled];
+  List<Object> get props => <Object>[key, name, description, lane, locked, defaultEnabled];
 }

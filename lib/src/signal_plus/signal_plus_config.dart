@@ -22,7 +22,6 @@ final class SignalPlusConfig {
 
   final String appId;
 
-  /// The app's language; without it, the device's.
   final Option<ServiceLocale> locale;
 
   final PushConfig push;
@@ -48,6 +47,6 @@ final class SignalPlusConfig {
 
   static ServiceLocale deviceLanguage() =>
       WidgetsFlutterBinding.ensureInitialized().platformDispatcher.locale.languageCode == ServiceLocale.ar.wire
-          ? ServiceLocale.ar
-          : ServiceLocale.en;
+      ? ServiceLocale.ar
+      : ServiceLocale.en;
 }

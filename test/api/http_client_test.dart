@@ -5,7 +5,9 @@ import '../support/api_harness.dart';
 
 void main() {
   test('every call carries the App ID, json accept and the configured language, never an Authorization', () async {
-    final ApiHarness harness = ApiHarness(config: const ApiConfig(appId: ApiHarness.appId, locale: ServiceLocale.en));
+    final ApiHarness harness = ApiHarness(
+      config: const ApiConfig(appId: ApiHarness.appId, locale: ServiceLocale.en),
+    );
     harness.on('GET /sdk/v1/categories', StubResponse.data(fixture('categories')));
 
     await harness.client.catalog.listCategories();

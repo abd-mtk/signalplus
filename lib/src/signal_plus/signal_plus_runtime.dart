@@ -37,6 +37,7 @@ final class SignalPlusRuntime {
     required this.client,
     required this.installationIds,
     required this.externalIds,
+    required this.channelIds,
     required this.device,
   }) : logger = config.log;
 
@@ -53,6 +54,8 @@ final class SignalPlusRuntime {
   final InstallationIdStore installationIds;
 
   final ExternalIdStore externalIds;
+
+  final CategoryChannelStore channelIds;
 
   final DeviceSnapshotReader device;
 
@@ -123,13 +126,23 @@ final class SignalPlusRuntime {
     if (!createChannels) return result;
     return result.match(Left.new, (final List<CategoryEntity> categories) async {
       final Either<ServiceFailure, Unit> created = await guard(() async {
+        final Set<String> generalNames = <String>{
+          for (final ServiceLocale language in ServiceLocale.values)
+            settings.localized(language).channelName.toLowerCase(),
+        };
+        bool isGeneral(final CategoryEntity category) =>
+            category.key.toLowerCase() == generalKey || generalNames.contains(category.name.trim().toLowerCase());
         final List<CategoryEntity> general = categories.where(isGeneral).toList();
-        await push.deleteChannels(<String>[
-          for (final CategoryEntity category in general)
-            if (category.channelId != PushSettings.channelId) category.channelId,
-        ]);
+        final List<CategoryEntity> kept = categories.where((final CategoryEntity item) => !isGeneral(item)).toList();
+        final List<String> own = <String>[for (final CategoryEntity category in kept) category.channelId];
+        await push.deleteChannels(
+          <String>{
+            for (final CategoryEntity category in general) category.channelId,
+            ...(await channelIds.ids()).where((final String id) => !own.contains(id)),
+          }.toList(),
+        );
         await push.registerChannels(<ChannelSpec>[
-          for (final CategoryEntity category in categories.where((final CategoryEntity item) => !isGeneral(item)))
+          for (final CategoryEntity category in kept)
             ChannelSpec(
               id: category.channelId,
               name: category.name,
@@ -137,6 +150,7 @@ final class SignalPlusRuntime {
               importance: ChannelSpec.importanceFor(category.lane),
             ),
         ]);
+        await channelIds.remember(own);
         return unit;
       }, Operations.createChannels);
       if (created.isRight()) categoryChannels = true;
@@ -144,22 +158,8 @@ final class SignalPlusRuntime {
     });
   }
 
-  /// A category that means the same as the default channel shares it, so Android does not list "General" twice.
-  /// What the service sends to its own channel id falls back to the default channel, which the manifest names.
-  bool isGeneral(final CategoryEntity category) {
-    final Set<String> names = <String>{
-      for (final ServiceLocale language in ServiceLocale.values) settings.localized(language).channelName.toLowerCase(),
-    };
-    return <String>{
-          category.key,
-          category.channelId,
-        }.any((final String id) => id.toLowerCase() == generalKey || id == PushSettings.channelId) ||
-        names.contains(category.name.trim().toLowerCase());
-  }
-
   static const String generalKey = 'general';
 
-  /// One Android channel per category, brought in line with the dashboard on every start.
   Future<void> syncChannels() async {
     if (defaultTargetPlatform.isAndroid) await categories(createChannels: true);
   }
@@ -229,9 +229,11 @@ final class SignalPlusRuntime {
   Future<Either<ServiceFailure, T>> guard<T>(final Future<T> Function() run, final String operation) =>
       RepositoryGuard.guard(logger, run, operation);
 
-  Future<T> serialized<T>(final Future<T> Function() run) {
-    final Future<T> next = queue.then((final void _) => run());
-    queue = next.then((final T _) {}, onError: (final Object _) {});
+  Future<Either<ServiceFailure, T>> serialized<T>(final Future<Either<ServiceFailure, T>> Function() run) {
+    final Future<Either<ServiceFailure, T>> next = queue.then(
+      (final void _) async => (await guard(run, Operations.storage)).flatMap(identity),
+    );
+    queue = next.then((final Either<ServiceFailure, T> _) {});
     return next;
   }
 

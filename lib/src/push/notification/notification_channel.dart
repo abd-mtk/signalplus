@@ -34,7 +34,6 @@ abstract final class AndroidChannels {
   static Option<AndroidFlutterLocalNotificationsPlugin> of(final FlutterLocalNotificationsPlugin plugin) =>
       Option.fromNullable(plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>());
 
-  /// The channels Android already keeps for the app; they outlive the process that created them.
   static Future<List<ChannelSpec>> existing(final FlutterLocalNotificationsPlugin plugin) => of(plugin).match(
     () async => const <ChannelSpec>[],
     (final AndroidFlutterLocalNotificationsPlugin platform) async => <ChannelSpec>[

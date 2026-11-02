@@ -6,22 +6,31 @@ abstract final class PreferencesModel {
   static PreferencesEntity fromJson(final JsonMap json) => PreferencesEntity(
     categories: JsonReader.list(json, 'Categories', category),
     quietHours: JsonReader.optMap(json, 'QuietHours').map(quietHours),
+    muted: JsonReader.optBoolean(json, 'Muted').getOrElse(() => false),
   );
 
-  static UpdatedPreferencesEntity updatedFromJson(final JsonMap json) => UpdatedPreferencesEntity(
-    categories: JsonReader.list(json, 'Categories', category),
-    quietHours: JsonReader.optMap(json, 'QuietHours').map(quietHours),
-    rejected: JsonReader.list(json, 'Rejected', (final Object? item) {
-      final JsonMap rejected = JsonReader.object(item, 'Rejected');
-      return RejectedChoiceEntity(key: JsonReader.string(rejected, 'Key'), error: JsonReader.string(rejected, 'Error'));
-    }),
-  );
+  static UpdatedPreferencesEntity updatedFromJson(final JsonMap json) {
+    final PreferencesEntity preferences = fromJson(json);
+    return UpdatedPreferencesEntity(
+      categories: preferences.categories,
+      quietHours: preferences.quietHours,
+      muted: preferences.muted,
+      rejected: JsonReader.list(json, 'Rejected', (final Object? item) {
+        final JsonMap rejected = JsonReader.object(item, 'Rejected');
+        return RejectedChoiceEntity(
+          key: JsonReader.string(rejected, 'Key'),
+          error: JsonReader.string(rejected, 'Error'),
+        );
+      }),
+    );
+  }
 
   static CategoryPreferenceEntity category(final Object? item) {
     final JsonMap json = JsonReader.object(item, 'CategoryPreference');
     return CategoryPreferenceEntity(
       key: JsonReader.string(json, 'Key'),
       name: JsonReader.string(json, 'Name'),
+      description: JsonReader.optString(json, 'Description'),
       enabled: JsonReader.boolean(json, 'Enabled'),
       locked: JsonReader.boolean(json, 'Locked'),
     );

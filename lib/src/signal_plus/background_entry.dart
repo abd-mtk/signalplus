@@ -25,8 +25,16 @@ abstract final class BackgroundSettings {
   static Future<void> saveConfig(final KeyValueStore store, final PushSettings config) =>
       store.write(configKey, jsonEncode(config.toJson()));
 
+  static Future<Option<String>> readSafely(final KeyValueStore store, final String key) async {
+    try {
+      return await store.read(key);
+    } on Object {
+      return const None();
+    }
+  }
+
   static Future<Option<PushSettings>> readConfig(final KeyValueStore store) async =>
-      (await store.read(configKey)).flatMap((final String raw) {
+      (await readSafely(store, configKey)).flatMap((final String raw) {
         try {
           return some(PushSettings.fromJson(JsonReader.object(jsonDecode(raw))));
         } on Object {
@@ -44,17 +52,16 @@ abstract final class BackgroundSettings {
       );
 
   static Future<Option<BackgroundHandler>> readHandler(final KeyValueStore store) async =>
-      (await store.read(handlerKey))
+      (await readSafely(store, handlerKey))
           .flatMap((final String raw) => Option.fromNullable(int.tryParse(raw)))
           .flatMap(
             (final int raw) =>
                 Option.fromNullable(PluginUtilities.getCallbackFromHandle(CallbackHandle.fromRawHandle(raw))),
           )
           .flatMap(
-            (final Function callback) =>
-                callback is BackgroundHandler
-                    ? Option<BackgroundHandler>.of(callback)
-                    : const Option<BackgroundHandler>.none(),
+            (final Function callback) => callback is BackgroundHandler
+                ? Option<BackgroundHandler>.of(callback)
+                : const Option<BackgroundHandler>.none(),
           );
 }
 
@@ -62,7 +69,7 @@ abstract final class BackgroundSettings {
 Future<void> signalPlusBackgroundEntry(final RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-  const KeyValueStore store = SecureKeyValueStore();
+  const KeyValueStore store = PreferencesKeyValueStore();
   await (await BackgroundSettings.readConfig(store)).match(
     () async {},
     (final PushSettings config) => SignalPlusInstance.showBackgroundMessage(message, config: config),

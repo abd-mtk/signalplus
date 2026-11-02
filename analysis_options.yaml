@@ -13,7 +13,6 @@ linter:
     prefer_const_declarations: true
     unnecessary_await_in_return: true
     prefer_final_locals: true
-    prefer_final_parameters: true
     prefer_final_fields: true
     avoid_print: true
     directives_ordering: true

@@ -1,18 +1,20 @@
-import '../../../../core/kits/data_kit.dart';
-import '../../../client/api_http_client.dart';
-import '../../../domain/entities/notification.dart';
-import '../../models/notification.dart';
+import '../../core/kits/data_kit.dart';
+import '../client/api_http_client.dart';
+import '../domain/entities/notification.dart';
+import 'models/notification.dart';
 
-final class NotificationsRemoteDataSource {
-  const NotificationsRemoteDataSource(this.http);
+final class NotificationsApi {
+  const NotificationsApi({required this.http, required this.logger});
 
   final ApiHttpClient http;
 
-  Future<bool> reportEvent(
+  final KitLogger logger;
+
+  Future<Either<ServiceFailure, bool>> reportEvent(
     final DeviceAuth device,
     final String notificationId,
     final DeliveryEventEntity event,
-  ) async {
+  ) => RepositoryGuard.guard(logger, () async {
     final ApiResponse response = await http.send(
       ApiRequest.device(HttpVerb.post, device, <String>[
         'notifications',
@@ -21,5 +23,5 @@ final class NotificationsRemoteDataSource {
       ], body: Some(DeliveryEventModel.toJson(event))),
     );
     return JsonReader.boolean(response.object, 'Applied');
-  }
+  }, 'REPORT_EVENT_ERROR');
 }

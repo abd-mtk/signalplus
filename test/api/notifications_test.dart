@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:signalplus/signalplus.dart';
+import 'package:signalplus/src/api/domain/entities/enums.dart';
 import 'package:signalplus/src/api/domain/entities/notification.dart';
 import '../support/api_harness.dart';
 

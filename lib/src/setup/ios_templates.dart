@@ -157,7 +157,6 @@ def add_extension(project, app, name)
   puts "#{name}: added, for notification images."
 end
 
-# Push Notifications: aps-environment in the Runner entitlements. Xcode signs release builds with production.
 def add_push(project, app, ios_dir)
   relative = app.build_configurations.map { |config| config.build_settings['CODE_SIGN_ENTITLEMENTS'] }.compact.first ||
              'Runner/Runner.entitlements'
@@ -180,7 +179,6 @@ def add_push(project, app, ios_dir)
   puts(changed ? 'Push Notifications: turned on.' : 'Push Notifications: already on.')
 end
 
-# Background Modes → Remote notifications, for the pushes that arrive while the app is closed.
 def add_background_mode(app, ios_dir)
   relative = app.build_configurations.map { |config| config.build_settings['INFOPLIST_FILE'] }.compact.first ||
              'Runner/Info.plist'

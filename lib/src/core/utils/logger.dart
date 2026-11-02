@@ -9,7 +9,6 @@ final class KitLogger {
   factory KitLogger.debug({final bool enabled = kDebugMode, final String tag = 'SignalPlus'}) =>
       KitLogger(sink: enabled ? debugSink : silentSink, tag: tag);
 
-  /// The app's own sink when it gave one, otherwise logs in debug builds only.
   factory KitLogger.of(final Option<LogSink> sink) =>
       sink.match(KitLogger.debug, (final LogSink value) => KitLogger(sink: value));
 

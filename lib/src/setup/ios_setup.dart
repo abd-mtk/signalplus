@@ -13,7 +13,6 @@ final class IosSetupResult {
   final String message;
 }
 
-/// Adds the notification image extension, Push Notifications and Background Modes to the Runner project.
 final class IosSetup {
   const IosSetup({required this.appRoot, this.run = Process.run});
 

@@ -7,7 +7,6 @@ import 'package:signalplus/signalplus.dart';
 import 'package:signalplus/src/push/firebase/messaging_service.dart';
 import 'package:signalplus/src/push/models/push_events.dart';
 import 'package:signalplus/src/push/models/push_settings.dart';
-import 'package:signalplus/src/push/notification/initial_notification.dart';
 import 'package:signalplus/src/push/notification/local_notification_service.dart';
 
 import '../support/push_fakes.dart';
@@ -27,7 +26,6 @@ void main() {
   late FakeLocalNotificationsPlugin plugin;
   late StreamController<RemoteMessage> onMessage;
   late StreamController<RemoteMessage> onOpened;
-  late InitialNotificationStore initial;
   late List<NotificationPayload> taps;
   late List<RemoteMessage> foreground;
   late PushEvents events;
@@ -40,12 +38,10 @@ void main() {
     notifications: LocalNotificationService(
       config: config,
       events: events,
-      initialNotification: initial,
       logger: silentLogger,
       plugin: Some(plugin),
       loadImage: (final String url) async => const None(),
     ),
-    initialNotification: initial,
     logger: silentLogger,
     onMessage: Some(onMessage.stream),
     onMessageOpenedApp: Some(onOpened.stream),
@@ -56,7 +52,6 @@ void main() {
     plugin = FakeLocalNotificationsPlugin();
     onMessage = StreamController<RemoteMessage>.broadcast();
     onOpened = StreamController<RemoteMessage>.broadcast();
-    initial = InitialNotificationStore();
     taps = <NotificationPayload>[];
     foreground = <RemoteMessage>[];
     events = eventsWith(onTap: taps.add, onForeground: foreground.add);
@@ -143,22 +138,23 @@ void main() {
     expect(streamed.single.notifyId, const Some('ntf_01'));
   });
 
-  test('the launch message is stored, not tapped', () async {
+  test('the launch message waits until the app listens for taps', () async {
     fcm.initialMessage = notificationMessage;
+    events = PushEvents();
+    service = build();
 
     await service.setupListeners();
 
-    expect(taps, isEmpty);
-    expect(initial.take().map((final NotificationPayload payload) => payload.title), const Some('N'));
+    expect(events.takePendingTap().map((final NotificationPayload payload) => payload.title), const Some('N'));
   });
 
-  test('if the launch message fails, no listener is registered', () async {
+  test('a failed launch message read is logged and the listeners still start', () async {
     fcm.initialMessageError = Exception('platform');
 
-    await expectLater(service.setupListeners(), throwsException);
+    await service.setupListeners();
 
-    expect(onMessage.hasListener, isFalse);
-    expect(onOpened.hasListener, isFalse);
+    expect(onMessage.hasListener, isTrue);
+    expect(onOpened.hasListener, isTrue);
   });
 
   test('dispose cancels the listeners', () async {
