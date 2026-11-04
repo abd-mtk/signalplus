@@ -1,3 +1,10 @@
+## 0.6.0
+
+* A notification's `Link` opens when it is tapped, the launch tap included: an `https` link in a browser inside the app (Custom Tabs on Android, `SFSafariViewController` on iOS), an app link such as `myapp://orders/12` through the system. The tap is still reported as opened and still reaches `onNotificationTap`.
+* `NotificationPayload.link`: the link, or `None` when there is none or it is not safe to open (`http`, `javascript`, `intent`, `file` and the like).
+* `PushConfig.openLinks` (default `true`): `false` leaves the link to the app.
+* Depends on `url_launcher`.
+
 ## 0.5.0
 
 * `categoryPreference(key)`, `setCategoryEnabled(key, enabled:)` and `toggleCategory(key)`: one category of the signed-in user, read and switched by its key. A locked category answers `CategoryLocked` without a request.

@@ -5,6 +5,7 @@ final class PushConfig {
     this.showNotificationImages = true,
     this.groupNotifications = false,
     this.clearNotificationsOnLaunch = false,
+    this.openLinks = true,
   });
 
   final bool requestPermissionOnStartup;
@@ -16,4 +17,6 @@ final class PushConfig {
   final bool groupNotifications;
 
   final bool clearNotificationsOnLaunch;
+
+  final bool openLinks;
 }

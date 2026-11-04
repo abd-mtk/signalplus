@@ -14,6 +14,7 @@ import '../device/device_snapshot.dart';
 import '../device/fresh_install.dart';
 import '../device/installation_id_store.dart';
 import '../push/bootstrap/signalplus_instance.dart';
+import '../push/models/notification_link.dart';
 import '../push/models/notification_payload.dart';
 import '../push/models/push_settings.dart';
 import '../push/push_port.dart';
@@ -49,6 +50,8 @@ abstract final class SignalPlusState {
   static DeviceFactory createDevice = defaultDevice;
 
   static void Function(void Function() run) launchScheduler = afterFirstFrame;
+
+  static Future<bool> Function(Uri link) openLink = NotificationLink.open;
 
   static final StreamController<RemoteMessage> messages = StreamController<RemoteMessage>.broadcast(sync: true);
 
@@ -138,13 +141,25 @@ abstract final class SignalPlusState {
       value.push.events.taps.listen((final NotificationPayload payload) {
         taps.add(payload);
         unawaited(value.reportOpened(payload));
+        follow(value, payload);
       }),
       value.push.events.tokens.listen((final String _) => unawaited(value.resync())),
       value.push.events.permissions.listen((final PushPermission _) => unawaited(value.resync())),
     ]);
     pendingLaunch = value.push.takeInitialNotification();
-    pendingLaunch.match(() {}, (final NotificationPayload payload) => unawaited(value.reportOpened(payload)));
+    pendingLaunch.match(() {}, (final NotificationPayload payload) {
+      unawaited(value.reportOpened(payload));
+      launchScheduler(() => follow(value, payload));
+    });
     deliverLaunch();
+  }
+
+  static void follow(final SignalPlusRuntime value, final NotificationPayload payload) {
+    if (!value.settings.options.openLinks) return;
+    payload.link.match(
+      () {},
+      (final Uri link) => unawaited(openLink(link).then((final bool _) {}, onError: (final Object _) {})),
+    );
   }
 
   static void deliverLaunch() {
@@ -195,6 +210,7 @@ abstract final class SignalPlusState {
     createClient = defaultClient;
     createDevice = defaultDevice;
     launchScheduler = afterFirstFrame;
+    openLink = NotificationLink.open;
   }
 
   static const ServiceFailure notInitialized = ServiceFailure(

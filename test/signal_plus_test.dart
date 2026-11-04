@@ -46,10 +46,10 @@ void main() {
 
   InstallationIdStore idStore() => InstallationIdStore(store: secure, newId: Some(() => 'install-${++ids}'));
 
-  void start() => SignalPlusState.attach(
+  void start([final SignalPlusConfig value = config]) => SignalPlusState.attach(
     SignalPlusRuntime(
-      config: config,
-      settings: config.settings(appName: 'Shop'),
+      config: value,
+      settings: value.settings(appName: 'Shop'),
       push: push,
       client: harness.client,
       installationIds: idStore(),
@@ -593,6 +593,79 @@ void main() {
       start();
 
       expect(taps.single.title, 'Early');
+    });
+
+    group('links', () {
+      late List<Uri> opened;
+
+      setUp(() {
+        opened = <Uri>[];
+        SignalPlusState.openLink = (final Uri link) async {
+          opened.add(link);
+          return true;
+        };
+      });
+
+      NotificationPayload linked(final String link) =>
+          NotificationPayload(title: 'T', body: '', data: <String, dynamic>{'Link': link});
+
+      test('a tap opens the https link and still reaches the listener', () async {
+        final List<NotificationPayload> taps = <NotificationPayload>[];
+        listeners.add(SignalPlus.onNotificationTap(taps.add));
+        start();
+
+        push.events.tap(linked('https://shop.example.com/orders/12'));
+        await pumpEventQueue();
+
+        expect(opened, <Uri>[Uri.parse('https://shop.example.com/orders/12')]);
+        expect(taps.single.link, Some(Uri.parse('https://shop.example.com/orders/12')));
+      });
+
+      test('an app link is opened too', () async {
+        start();
+
+        push.events.tap(linked('myapp://orders/12'));
+        await pumpEventQueue();
+
+        expect(opened, <Uri>[Uri.parse('myapp://orders/12')]);
+      });
+
+      test('the launch tap opens its link once, without a listener', () async {
+        push.launch = Some(linked('https://shop.example.com'));
+        start();
+        listeners.add(SignalPlus.onNotificationTap((final NotificationPayload _) {}));
+
+        expect(opened, <Uri>[Uri.parse('https://shop.example.com')]);
+      });
+
+      test('openLinks: false leaves the link to the app', () async {
+        start(
+          const SignalPlusConfig(
+            appId: ApiHarness.appId,
+            locale: Some(ServiceLocale.ar),
+            registerOnStart: false,
+            push: PushConfig(openLinks: false),
+            logger: Some(silent),
+          ),
+        );
+
+        push.events.tap(linked('https://shop.example.com'));
+        await pumpEventQueue();
+
+        expect(opened, isEmpty);
+      });
+
+      test('a refused or failing open does not break the tap', () async {
+        SignalPlusState.openLink = (final Uri _) async => throw StateError('no browser');
+        final List<NotificationPayload> taps = <NotificationPayload>[];
+        listeners.add(SignalPlus.onNotificationTap(taps.add));
+        start();
+
+        push.events.tap(linked('https://shop.example.com'));
+        await pumpEventQueue();
+
+        expect(taps, hasLength(1));
+      });
     });
 
     test('a closure cannot be a background handler', () async {

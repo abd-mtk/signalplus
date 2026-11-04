@@ -3,6 +3,7 @@ import 'package:fpdart/fpdart.dart';
 
 import '../messages/extensions.dart';
 import '../messages/message_keys.dart';
+import 'notification_link.dart';
 
 final class NotificationPayload extends Equatable {
   const NotificationPayload({
@@ -33,6 +34,8 @@ final class NotificationPayload extends Equatable {
   Option<String> get notifyId => data.nonEmptyTextAt(MessageKeys.notifyId);
 
   Option<String> get category => data.nonEmptyTextAt(MessageKeys.category);
+
+  Option<Uri> get link => data.nonEmptyTextAt(MessageKeys.link).flatMap(NotificationLink.parse);
 
   @override
   List<Object> get props => <Object>[title, body, data, rawPayload];

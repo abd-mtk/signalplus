@@ -13,6 +13,35 @@ void main() {
       expect(config.showNotificationImages, isTrue);
       expect(config.clearNotificationsOnLaunch, isFalse);
       expect(config.groupNotifications, isFalse);
+      expect(config.openLinks, isTrue);
+    });
+  });
+
+  group('NotificationPayload.link', () {
+    Option<Uri> link(final Object? value) =>
+        NotificationPayload(title: '', body: '', data: <String, dynamic>{'Link': value}).link;
+
+    test('https with a host and app links are read', () {
+      expect(link('https://shop.example.com/orders/12'), Some(Uri.parse('https://shop.example.com/orders/12')));
+      expect(link('myapp://orders/12'), Some(Uri.parse('myapp://orders/12')));
+    });
+
+    test('anything unsafe or malformed is ignored', () {
+      for (final Object? value in <Object?>[
+        null,
+        '',
+        'http://shop.example.com',
+        'javascript:alert(1)',
+        'intent://x#Intent;end',
+        'file:///etc/hosts',
+        'data:text/html,x',
+        'https:///no-host',
+        'https://shop.example.com/a b',
+        'orders/12',
+        'https://x.com/${'a' * 2048}',
+      ]) {
+        expect(link(value), const None(), reason: '$value');
+      }
     });
   });
 
