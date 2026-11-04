@@ -130,6 +130,7 @@ SignalPlus.onNotificationTap((final NotificationPayload payload) {
 ```
 
 - Taps are reported as opened automatically.
+- A notification sent with a `Link` opens it when tapped: an `https` link in a browser inside the app (Custom Tabs on Android, Safari View on iOS), an app link such as `myapp://orders/12` through the system. `payload.link` holds it. Set `PushConfig(openLinks: false)` to handle it yourself.
 - `payload.data` holds every key your backend sent with the notification.
 - Notifications that arrive while the app is in the background or closed are shown by the package itself; you write nothing for them.
 
@@ -266,6 +267,7 @@ Every call returns `Either<ServiceFailure, T>` and never throws:
 | `showNotificationImages`     | `true`  | Show the images notifications carry.              |
 | `groupNotifications`         | `false` | Group notifications under one summary on Android. |
 | `clearNotificationsOnLaunch` | `false` | Clear shown notifications when the app starts.    |
+| `openLinks`                  | `true`  | Open a notification's `Link` when it is tapped.   |
 
 Everything else is set by the package: the app's name, the notification icon (your `ic_notification`, otherwise the package's bell), and the default channel name and group summary, in the app's language.
 

@@ -4,6 +4,7 @@ abstract final class MessageKeys {
   static const String image = 'image';
   static const String notifyId = 'NotifyId';
   static const String category = 'Category';
+  static const String link = 'Link';
   static const String channelId = 'channel_id';
 }
 
