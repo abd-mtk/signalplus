@@ -1,5 +1,5 @@
-group 'com.signalplus'
-version '1.0'
+group = 'com.signalplus'
+version = '1.0'
 
 buildscript {
     repositories {
@@ -8,7 +8,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.11.1'
+        classpath 'com.android.tools.build:gradle:9.5.1'
     }
 }
 
@@ -22,15 +22,15 @@ rootProject.allprojects {
 apply plugin: 'com.android.library'
 
 android {
-    namespace 'com.signalplus'
-    compileSdk 36
+    namespace = 'com.signalplus'
+    compileSdk = 37
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
-        minSdkVersion 24
+        minSdk = 24
     }
 }

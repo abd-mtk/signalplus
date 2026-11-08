@@ -47,3 +47,7 @@ app.*.map.json
 resources/
 docs/
 graphify-out/
+# Plugin Android project opened standalone in Android Studio
+/android/.gradle/
+/android/build/
+/android/local.properties
