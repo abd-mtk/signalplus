@@ -1,3 +1,7 @@
+## 0.6.2
+
+* Android: compiled against SDK 37 (`compileSdk 37`).
+
 ## 0.6.0
 
 * A notification's `Link` opens when it is tapped, the launch tap included: an `https` link in a browser inside the app (Custom Tabs on Android, `SFSafariViewController` on iOS), an app link such as `myapp://orders/12` through the system. The tap is still reported as opened and still reaches `onNotificationTap`.
